@@ -6,8 +6,10 @@
 # 2 - Backpropagation
 
 import torch
+import numpy as np
 from torch import nn
 import matplotlib.pyplot as plt
+
 
 # known paremeters
 weight = 0.7
@@ -70,8 +72,10 @@ torch.manual_seed(42)
 # create a instance of the model (this is a subclass of nn.Module)
 model_0 = LinearRegressionModel()
 
-print(list(model_0.parameters()))
-print(model_0.state_dict())
+# a parameter is a value that the model sets itself
+
+#print(list(model_0.parameters()))
+#print(model_0.state_dict())
 
 # making prediction using 'torch.inference_mode()'
 # To check the model predictive power, we need see how well it predicts 'y_test' based on 'X_test'
@@ -83,4 +87,93 @@ with torch.inference_mode():
     y_preds = model_0(X_test)
 
 
-plot_predictions(predicitions=y_preds)
+#plot_predictions(predicitions=y_preds)
+
+# Train model
+# The whole idea of training is for a model to move from some unknown parameters to some known parameters
+# one way to mesure how poor or good a model is, is by using a loss function
+# Loss function - is a way to measure how wrong the models predictions are. To ideal outputs, lower is better
+# Optimizer - Takes into account the loss of a model and adjust the models parameters (weight & bias) to improve the loss function
+# And scpecifically for PyTorch we need a training and a testing loop
+print(list(model_0.parameters()))
+
+
+# setup a loss function
+loss_fn = nn.L1Loss()
+
+# setup an optmizer
+optimizer = torch.optim.SGD(
+    params=model_0.parameters(), lr=0.01) # lr - learning rate (most important hyperparameter)
+
+# build a training  and testing loop
+# 0 Loop through the data
+# 1 Forward pass (this involver data moving throug the model) to make predictions - also called forward propagation
+# 2 Calculate the loss (compare foward pass predictions to ground truth labels)
+# 3 Optomezer zero grad
+# 4 Loss backward (backpropagation) - move backwards through the network to calculate the gradients of each parameters of the model with respect to the loss
+# 5 Optimzer setup (gradient descent) - use the optimizer to adjust our model parameters to try and improve the loss
+
+
+## Training
+# An epoch is one loop through the entire dataset
+model_0.parameters()
+epochs = 200
+
+# to track these values
+epoch_count = []
+loss_values = []
+test_loss_value = []
+
+# 0 Loop through the data
+for epoch in range(epochs):
+    # set the model to training mode
+    model_0.train() # train mode in PyTorch set all parameters that requires gradients 
+
+    # 1 Foward pass
+    y_pred = model_0(X_train)
+
+    # 2 Caulculate the loss
+    loss = loss_fn(y_pred, y_train)
+    #print(f"Loss: {loss}")
+
+    # 3 Optimizer zero grad
+    optimizer.zero_grad()
+
+    # 4 Loss backward
+    loss.backward()
+
+    # 5 Optimizer step
+    # By default how the optimizer changes will accumulate through the loop
+    # so we have to zero them above in step 3 for the next iteration of the loop
+    optimizer.step()
+
+    # TESTING ##############################################################################################
+    # turn off different settings in the model not needed for evaluation/testing (dropout/batch norm layers)
+    model_0.eval() # turn off gradient tracking
+
+    with torch.inference_mode():
+        # 1 - Do the foward model pass
+        test_pred = model_0(X_test)
+
+        # 2 - Calculate the loss
+        test_loss = loss_fn(test_pred, y_test)
+
+    # print out whats happening
+    if epoch % 10 == 0:
+        epoch_count.append(epoch)
+        loss_values.append(loss)
+        test_loss_value.append(test_loss)
+        print(f"Epoch: {epoch} | Loss: {loss} | Test loss: {test_loss}")
+
+
+# plot the loss curves
+plt.plot(epoch_count, np.array(torch.tensor(loss_values).numpy()), label='Train loss')
+plt.plot(epoch_count, test_loss_value, label='Test loss')
+plt.title("Training and test loss curves")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
+
+with torch.inference_mode():
+    y_preds_new = model_0(X_test)
+    plot_predictions(predicitions=y_preds_new)
