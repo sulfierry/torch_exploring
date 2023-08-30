@@ -52,9 +52,35 @@ class LinearRegressionModel(nn.Module):
         self.bias = nn.Parameter(
             torch.randn(1, requires_grad=True, dtype=torch.float32))
         
-        # foward method to define the computation in the model
-        def forward(self, x: torch.Tensor) -> torch.Tensor: # x is a input
-            return self.weights * x + self.bias # linear regression formula
+    # foward method to define the computation in the model
+    def forward(self, x: torch.Tensor) -> torch.Tensor: # x is a input
+        return self.weights * x + self.bias # linear regression formula
+
+# torch.nn - contains all of the buildings for computational graphs
+# torch.nn.Parameter - what parameters should be adjusted during training
+# torch.nn.Module - The base class for all neural network modules, if you subclass it, you should overwrite forward()
+# torch.optim - this is a package implementing various optimization algorithms (help with gradient descent)
+# def foward() - All nn.Module subclasses override the forward() method, which defines the computation performed at every call
+# torch.utils.data.Dataset - Represents a map between key (label) and sample (features) pairs of your data. Such as images and their associated labels
+# torch.utils.data.DataLoader - Allows you to iterate over your data
+
+# create a random seed
+torch.manual_seed(42)
+
+# create a instance of the model (this is a subclass of nn.Module)
+model_0 = LinearRegressionModel()
+
+print(list(model_0.parameters()))
+print(model_0.state_dict())
+
+# making prediction using 'torch.inference_mode()'
+# To check the model predictive power, we need see how well it predicts 'y_test' based on 'X_test'
+# When we pass data through the model, its going to run it through the forward() method
+
+# Make predictions with model
+with torch.inference_mode():
+    preds = model_0(X_test)
+    y_preds = model_0(X_test)
 
 
-    pass
+plot_predictions(predicitions=y_preds)
