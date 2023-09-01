@@ -8,7 +8,6 @@ computer vision libraries in pytorch:
 'torch.utils.data.DataLoader' is an iterator that provides all these features
 """
 import torch
-import torchvision
 from torch import nn
 import matplotlib.pyplot as plt
 from torchvision.transforms import ToTensor
@@ -55,6 +54,7 @@ image, label = train_data[0]
 torch.manual_seed(42)
 fig = plt.figure(figsize=(9, 9))
 rows, cols = 4, 4
+"""
 for i in range(1, rows * cols + 1):
     ramdom_idx = torch.randint(0, len(train_data), size=[1]).item()
     img, label = train_data[ramdom_idx]
@@ -63,3 +63,204 @@ for i in range(1, rows * cols + 1):
     plt.axis(False)
     plt.imshow(img.squeeze(), cmap="gray")
 plt.show()
+"""
+#print(train_data)
+#print(test_data)
+# prepare dataloader
+from torch.utils.data import DataLoader
+# setup the btach size hyperparameter
+BATCH_SIZE = 32
+
+# turn datasets into iterables (batches)
+train_dataloader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+
+test_dataloader = DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=False)
+
+# check out what we've created
+# print(f"DataLoeaders: {train_dataloader, test_dataloader}")
+# print(f"Length of train_dataloader: {len(train_dataloader)} batches of {BATCH_SIZE} ...")
+# print(f"Length of test_dataloader: {len(test_dataloader)} batches of {BATCH_SIZE} ...")
+
+# check out whats inside the training dataloader
+train_features_batch, train_labels_batch = next(iter(train_dataloader))
+# print(train_features_batch.shape, train_labels_batch.shape)
+
+# show a saple
+torch.manual_seed(42)
+random_idx = torch.randint(0, len(train_features_batch), size=[1]).item()
+img, label = train_features_batch[random_idx], train_labels_batch[random_idx]
+"""
+plt.imshow(img.squeeze(), cmap="gray")
+plt.title(class_names[label])
+plt.axis(False)
+print(f"Image size: {img.shape}")
+print(f"Label: {label}, label size: {label.shape}")
+plt.show()
+"""
+
+# Build a baseline model
+
+# create a flatten layer
+flatten_model = nn.Flatten()
+
+# get a single sample
+x = train_features_batch[0]
+
+# flatten the sample
+output = flatten_model(x) # prerform forward pass
+
+# print out what happened
+print(f"Shape before flattering: {x.shape} -> [color_channels, height, width]")
+print(f"Shape before flattering: {output.shape} -> [color_channels, height * width]")
+
+from torch import nn
+class FashioMINSTModelV0(nn.Module):
+    def __init__(self, input_shape: int, hidden_units: int, output_shape: int):
+        super().__init__()
+        self.layer_stack = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(input_shape, hidden_units),
+            nn.Linear(hidden_units, output_shape)
+        )
+
+
+    def forward(self, x):
+        return self.layer_stack(x)
+    
+torch.manual_seed(42)
+
+# print((x.shape[1] * x.shape[2]))
+# setup model with input parameters
+model_0 = FashioMINSTModelV0(
+    input_shape = (x.shape[1] * x.shape[2]), # 28 * 28
+    hidden_units=10,
+    output_shape=len(class_names) # one for every class
+).to("cpu")
+
+# setup loss, optimizer and evulation metrics
+# loss function for multi-class classification - 'nn.CrossEntropyLoss()'
+# optimizer - 'torch.optim.SGD()'
+# accuracy as our evaluation metric
+from helper_function import accuracy_fn
+
+# setup loss function and optimizer
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.SGD(model_0.parameters(), lr=0.1)
+
+# creating a function to time our experiments
+from timeit import default_timer as timer
+def print_train_time(start: float,
+                     end: float,
+                     device: torch.device = None):
+    """Prints difference between start and end time."""
+    total_time = end - start
+    print(f"Training time on {device}: {total_time:.3f} seconds")
+    return total_time  
+
+# createa training loop and training a model  on batches of data
+# loop through epochs
+# loop through training batches, perform training steps, calculate the train loss per batch
+# loop through testing batches, perform testing steps, calculate the test loss per batch
+# print out whats happening
+# time it all (for fun)
+
+# tqdm for progress bar
+from tqdm.auto import tqdm
+
+# set the seed and start the timer
+torch.manual_seed(42)
+train_time_start_on_cpu = timer()
+
+# set the number of epochs (we ill keep this small for faster training time)
+epochs = 5
+
+# create a training and test loop
+for epoch in tqdm(range(epochs)):
+    print(f"Epoch: {epoch}\n----")
+    # training
+    train_loss = 0
+    # add a loop to loop through the training batches
+    for batch, (X, y) in enumerate(train_dataloader):
+        model_0.train()
+        # forward pass
+        y_pred = model_0(X)
+
+        # calculate the loss
+        loss = loss_fn(y_pred, y)
+        train_loss += loss # accumulate train loss
+
+        # optimizer zero grad
+        optimizer.zero_grad()
+        
+        # loss backward
+        loss.backward()
+
+        # optimizer step
+        optimizer.step()
+
+        # print out whats happening
+        if batch % 400 == 0:
+            print(f"Looked at {batch * len(X)}/{train_dataloader.dataset} samples.")
+
+    # divide total train loss by length of train dataloader to get average train loss
+    train_loss /= len(train_dataloader)
+
+    # testing
+    test_loss, test_acc = 0, 0
+    model_0.eval()
+    with torch.inference_mode():
+        for X_test, y_test in test_dataloader:
+            # forward pass
+            test_pred = model_0(X_test)
+
+            # calculate the loss accumulatively
+            test_loss += loss_fn(test_pred, y_test)
+
+            # calculate the accuracy
+            test_acc += accuracy_fn(y_test, test_pred.argmax(dim=1))
+
+        # calculate the test loss average per batch
+        test_loss /= len(test_dataloader)
+
+        # calculate the test acc average per batch
+        test_acc /= len(test_dataloader)
+    
+    # print out the test loss and test accuracy
+    print(f"\nTrain loss: {train_loss:.4f}  |  Test loss: {test_loss:.4f})  |  Test_acc: {test_acc:.4f}")
+
+# calculate training time
+train_time_end_on_cpu = timer()
+total_train_time_model_0 = print_train_time(
+                                start=train_time_start_on_cpu,
+                                end=train_time_end_on_cpu,
+                                device=str(next(model_0.parameters()).device))
+
+# make predictions and get model_0 results
+
+torch.manual_seed(42)
+def eval_model(model: torch.nn.Module,
+               data_loader: torch.utils.data.DataLoader,
+               loss_fn: torch.nn.Module,
+               accuracy_fn):
+    """returns a dictionary contaning the results of model predicting on data_loader"""
+    loss, acc = 0, 0
+    model.eval()
+    with torch.inference_mode():
+        for X, y in data_loader:
+            # make predictions
+            y_pred = model(X)
+            # accumulate the loss and acc values per batch
+            loss += loss_fn(y_pred, y)
+            acc += accuracy_fn(y, y_pred.argmax(dim=1)) # argmax to get the index of the max value
+
+        # scale loss and acc to find the average loss/acc per batch
+        loss /= len(data_loader)
+        acc /= len(data_loader)
+    return {"model_name": model.__class__.__name__, # only works when model was created with a class
+            "model_loss": loss.item(),
+            "model_acc": acc}
+
+# calculate model 0 results on test dataset
+model_0_results = eval_model(model_0, test_dataloader, loss_fn, accuracy_fn)
+
+print(model_0_results)
