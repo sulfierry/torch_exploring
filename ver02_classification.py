@@ -522,3 +522,38 @@ def sigmoid(x: torch.tensor) -> torch.Tensor:
 #plt.show()
 
 # putting all together with a multi-class classification problem
+# create a toy multi-class dataset
+import torch
+import matplotlib.pyplot as plt
+from sklearn.datasets import make_blobs
+from sklearn.model_selection import train_test_split
+
+# set the hyperparameters for data creation
+NUM_SAMPLES = 1000
+NUM_CLASSES = 4
+NUM_FEATURES = 2
+RANDOM_SEED = 42
+
+# create multi-class data
+X_blob, y_blob = make_blobs(n_samples=NUM_SAMPLES,
+                            n_features=NUM_FEATURES,
+                            centers=NUM_CLASSES,
+                            cluster_std=1.5, # give the clusters a bit of variance
+                            random_state=RANDOM_SEED)
+
+# turn data into tensors
+X_blob = torch.from_numpy(X_blob).type(torch.float)
+y_blob = torch.from_numpy(y_blob).type(torch.float) # long == int64
+
+# split into train and test
+X_blob_train, X_blob_test, y_blob_train, y_blob_test = train_test_split(X_blob, # features
+                                                                        y_blob, # labels
+                                                                        test_size=0.2, # 20% of data for testing
+                                                                        random_state=RANDOM_SEED)
+
+# plot data
+#plt.figure(figsize=(10, 7))
+#plt.scatter(X_blob[:, 0], X_blob[:, 1], c=y_blob, cmap=plt.cm.RdYlBu)
+#plt.show()
+
+# building a muilti-class classification model
