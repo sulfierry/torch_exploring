@@ -150,11 +150,15 @@ with torch.inference_mode():
     y_logits = model_4(X_blob_test)
 
 # go from logits -> predictions probabilities
-y_pred_probs = torch.softmax(y_logits, dim=1)
-#print(y_pred_probs[:5])
+# Turn predicted logits in prediction probabilities
+y_pred_probs = torch.softmax(y_logits, dim=1)#print(y_pred_probs[:5])
 # go from pred probs to pred labels
-y_pred_probs = torch.argmax(y_pred_probs, dim=1)
+#y_pred_probs = torch.argmax(y_pred_probs, dim=1)
 #print(y_preds[:10])
+
+# Turn prediction probabilities into prediction labels
+y_preds = y_pred_probs.argmax(dim=1)
+
 from helper_function import plot_decision_boundary
 
 
@@ -165,7 +169,7 @@ plot_decision_boundary(model_4, X_blob_train, y_blob_train)
 plt.subplot(1, 2, 2)
 plt.title("Test")
 plot_decision_boundary(model_4, X_blob_test, y_blob_test)
-plt.show()
+#plt.show()
 
 """
 A few more classification metrics:
@@ -188,3 +192,10 @@ Can be hard to use with large number of classes
 
 classification report - a collection of some of the main classification metrics such as precision, recall and F1-score
 """
+
+from torchmetrics import Accuracy
+
+torchmetrics_accuracy = Accuracy(task='multiclass', num_classes=NUM_CLASSES).to(device)
+
+# Calculate accuracy
+print(torchmetrics_accuracy(y_preds, y_blob_test))
