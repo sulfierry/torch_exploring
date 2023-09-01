@@ -3,7 +3,7 @@ from torch import nn
 import matplotlib.pyplot as plt
 
 
-device = "mps" if True else "cpu" or "cuda" if torch.cuda.is_available() else "cpu"
+device = "mps" if True else "cuda" if torch.cuda.is_available() else "cpu"
 #print(f"Using device: {device}")
 
 # create some data using the linear regression formula of y = weight * X + bias
