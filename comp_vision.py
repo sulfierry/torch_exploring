@@ -596,8 +596,8 @@ loss_fn = nn.CrossEntropyLoss() # because is a multi-class classification proble
 optimizer = torch.optim.SGD(params=model_2.parameters(), lr=0.1)
 
 # training and testint 'model_2' using our training and test functions
-torch.manual_seed(42)
-torch.mps.manual_seed(42)
+#torch.manual_seed(42)
+#torch.mps.manual_seed(42)
 
 # measure time
 from timeit import default_timer as timer
@@ -635,8 +635,6 @@ compare_results = pd.DataFrame([model_0_results,
                                 model_1_results, 
                                 model_2_results])
 
-print(compare_results) 
-
 # add training time to results comparison
 compare_results["training_time"] = [total_train_time_model_0,
                                     total_train_time_model_1, 
@@ -650,7 +648,7 @@ plt.ylabel("Model")
 plt.show()
 
 # make and evaluate random predictions with best model
-def make_predictions(mode: torch.nn.Module,
+def make_predictions(model: torch.nn.Module,
                      data: list,
                      device: torch.device = device):
     pred_probs = []
@@ -683,7 +681,7 @@ for sample, label in random.sample(list(test_data), k=9):
     test_labels.append(label)
 
 # make predictions
-pred_probs = make_predictions(model =model_2,data=test_samples)
+pred_probs = make_predictions(model_2,data=test_samples)
 # view first two prediction probabilities
 #print(pred_probs[:2])
 
@@ -718,3 +716,5 @@ for i, sample in enumerate(test_samples):
         plt.title(title_text, color="r")
     plt.axis(False)
 plt.show()  
+
+# making a confusion matrix for further prediction evaluation
