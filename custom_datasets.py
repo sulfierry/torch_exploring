@@ -1,11 +1,27 @@
 import torch
+import random
+import zipfile
+import pathlib
+import requests
+import torchvision
+import numpy as np
+import pandas as pd
 from torch import nn
+from PIL import Image
+from pathlib import Path
+from tqdm.auto import tqdm
+from torchinfo import summary
+import matplotlib.pyplot as plt
+from typing import Tuple, Dict, List
+from torchvision.transforms import Resize
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, Dataset
+
+
 
 device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 
-import requests
-import zipfile
-from pathlib import Path
+
 
 # setup path to a data folder
 data_path = Path("data/")
@@ -40,8 +56,6 @@ def walk_through_dir(dir_path):
 #print(walk)
 
 # visualizing data
-import random
-from PIL import Image
 
 # set seed
 #random.seed(42)
@@ -58,16 +72,15 @@ image_class = random_image_path.parent.stem
 # open image
 img = Image.open(random_image_path)
 
-# print metadata
-print(f"Random image path: {random_image_path}")
-print(f"Image class: {image_class}")
-print(f"Image height: {img.height}")
-print(f"Image width: {img.width}")
-print(f"Image mode: {img.mode}")
+# # print metadata
+# print(f"Random image path: {random_image_path}")
+# print(f"Image class: {image_class}")
+# print(f"Image height: {img.height}")
+# print(f"Image width: {img.width}")
+# print(f"Image mode: {img.mode}")
 #img.show()
 
-import numpy as np
-import matplotlib.pyplot as plt
+
 
 # turn the image into an array
 img_as_array = np.array(img)
@@ -83,8 +96,6 @@ img_as_array = np.array(img)
 # 1 - turn the target data into tensors (numerical representation of the image class)
 # 2 - turn it into a 'touch.utils.data.Dataset' we call tese data Dataset and DataLoader
 
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
 
 # transforming data with torchvision.transforms
 # write a transfm for image
@@ -129,7 +140,7 @@ train_dir = image_path / "train"
 test_dir = image_path / "test"
 
 # loading image data using 'imageFolder'
-from torchvision import datasets
+
 train_data = datasets.ImageFolder(root=train_dir, 
                                   transform=data_transform, # a transform for the data
                                   target_transform=None)  # transform for the label/target
@@ -144,11 +155,11 @@ class_dict = train_data.class_to_idx
 
 # index on the train_data Dataset to get a single image and label
 img, label = train_data[0][0], train_data[0][1]
-print(f"Image label: {label}")
-print(f"Image tensor: \n {img}")
-print(f"Image shape: {img.shape}")
-print(f"Image datatype: {img.dtype}")
-print("Label datatype:  {type(label)}")
+# print(f"Image label: {label}")
+# print(f"Image tensor: \n {img}")
+# print(f"Image shape: {img.shape}")
+# print(f"Image datatype: {img.dtype}")
+# print("Label datatype:  {type(label)}")
 
 # rearrange the order dimensions
 img_permute = img.permute(1, 2, 0)
@@ -165,7 +176,7 @@ img_permute = img.permute(1, 2, 0)
 # plt.show()
 
 # Turn loaded images into 'DataLoader'
-from torch.utils.data import DataLoader
+
 train_dataloader = DataLoader(dataset=train_data,
                               batch_size=1,
                               num_workers=0,
@@ -178,15 +189,13 @@ test_dataloader = DataLoader(dataset=test_data,
 img, label = next(iter(train_dataloader))
 
 # batch size will be 1, change batch size if you like
-print(f"Image shape: {img.squeeze().shape} -> [batch_size, color_channels, height, width]")
-print(f"Label shape: {label.shape}")
+# print(f"Image shape: {img.squeeze().shape} -> [batch_size, color_channels, height, width]")
+# print(f"Label shape: {label.shape}")
 
 # loading image data with a custom 'Dataset'
 # 1 - images from file
 # 2 - get class names from the Dataset
 # 3 - get classes as dictionary from the Dataset
-
-from typing import Tuple, Dict, List
 
 # instance of torchvision.datasets.ImageFolder()
 train_list, train_dict = train_data.classes, train_data.class_to_idx
@@ -230,8 +239,7 @@ find_classes(target_directory)
 5 - Overwrite __len__ and __getitem__ to make our dataset iterable
 """
 # write a custom dataset class
-from torch.utils.data import Dataset
-import pathlib
+
 # 1 - subclass torch.utils.data.Dataset
 class ImageFolderCustom(Dataset):
     # 2 - initialize our custom dataset
@@ -268,7 +276,7 @@ class ImageFolderCustom(Dataset):
         else:
             return img, class_idx # return untransformed data, label (X, y)
 
-from torchvision import transforms
+
 
 # create a transform
 train_transforms = transforms.Compose([
@@ -357,7 +365,7 @@ def display_random_images(dataset: torch.utils.data.Dataset,
 #                       seed=None)
 
 # Turn custom loaded imates into 'DataLoader'
-from torch.utils.data import DataLoader
+
 BATCH_SIZE = 64
 NUM_WORKERS = 0
 train_dataloader_custom = DataLoader(dataset=train_data_custom,
@@ -398,7 +406,7 @@ image_path_list = list(image_path.glob("*/*/*.jpg"))
 # model_0: TinyVGG without data augmentation
 # creating transforms and loading data for model_0
 simple_transform = transforms.Compose([
-    transforms.Resize((63, 64)),
+    transforms.Resize((64, 64)),
     transforms.ToTensor()
 ])
 
@@ -464,32 +472,450 @@ class TinyVGG(nn.Module):
         )
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features=hidden_units*12*13,
+            nn.Linear(in_features=hidden_units*13*13,
                       out_features=output_shape)
         )
-
+    
     def forward(self, x):
         x = self.conv_block_1(x)
-        print(x.shape)
+        # print(x.shape)
         x = self.conv_block_2(x)
-        print(x.shape)
+        # print(x.shape)
         x = self.classifier(x)
-        print(x.shape)
+        # print(x.shape)
         return x # self.classifier(self.conv_block_2(self.conv_block_1(x))) # benefits from operator fusion
+
 
 torch.manual_seed(42)
 model_0 = TinyVGG(input_shape=3, # number of color channels in image data
                   hidden_units=10, # number of hidden units in a conv layer
                   output_shape=len(class_names)).to(device) # number of classes in the data
-print(model_0)
+#print(model_0)
 
 # try a forward pass on a single image (to test the model)
 # get a single image batch
 image_batch, label_batch = next(iter(train_dataloader_simple))
 
 # try a forward pass
-print(model_0(image_batch.to(device)))
+#print(model_0(image_batch.to(device)))
 
-from torchinfo import summary
 
-summary(model_0, input_size=(1, 3, 63, 64))
+
+summary(model_0, input_size=(1, 3, 64, 64))
+
+# create train  and test loops functions
+
+def train_step(model: torch.nn.Module,
+               dataloader: torch.utils.data.DataLoader,
+               loss_fn: torch.nn.Module,
+               optimizer: torch.optim.Optimizer):
+    # put the model into training mode
+    model.train()
+
+    # setup trian loss and train accuracy values
+    train_loss, train_acc = 0, 0
+
+    # loop through data loader data batches
+    for batch, (X, y) in enumerate(dataloader):
+        # send data to the target device
+        X, y = X.to(device), y.to(device)
+
+        # forward pass
+        y_pred = model(X) # output model logits
+
+        # calculate loss
+        loss = loss_fn(y_pred, y)
+        train_loss += loss.item()
+
+        # optimizer zero grad
+        optimizer.zero_grad()
+
+        # loss backward
+        loss.backward() 
+
+        # optimizer stop
+        optimizer.step()
+
+        # calculate accuracy metric
+        y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+        train_acc += (y_pred_class == y).sum().item() / len(y)
+    
+    # adjust metrics to get average loss and accuracy per betch
+    train_loss = train_loss / len(dataloader)
+    train_acc = train_acc / len(dataloader)
+
+    return train_loss, train_acc
+
+def test_step(model: torch.nn.Module,
+              dataloader: torch.utils.data.DataLoader,
+              loss_fn: torch.nn.Module,
+              device=device):
+    # put model in eval mode
+    model.eval()
+
+    # setup test loss and test accuracy values
+    test_loss, test_acc = 0, 0
+
+    # turn on inference mode
+    with torch.inference_mode():
+        # loop through Dataloader batches
+        for batch, (X, y) in enumerate(dataloader):
+            # send data to the target device
+            X, y = X.to(device), y.to(device)
+
+            # forward pass
+            test_pred_logits = model(X)
+
+            # calculate the loss
+            loss = loss_fn(test_pred_logits, y)
+            test_loss += loss.item()
+
+            # calculate the accuracy
+            test_pred_labels = test_pred_logits.argmax(dim=1)
+            test_acc += ((test_pred_labels == y).sum().item() / len(y))
+    
+    # adjust metrics to get average loss and accuracy per batch
+    test_loss = test_loss / len(dataloader)
+    test_acc = test_acc / len(dataloader)
+    return test_loss, test_acc
+
+# creating a 'train()' function to combine train_step() and test_step()
+
+# create a train fcuntion that takes in various models paremeters 
+def train(model: torch.nn.Module,
+          train_dataloader,
+          test_dataloader,
+          optimizer,
+          loss_fn: torch.nn.Module = nn.CrossEntropyLoss(),
+          epochs: int = 5,
+          device=device):
+    
+    # create empty results dictionary
+    results = {"train_loss": [],
+               "train_acc": [],
+                "test_loss": [],
+                "test_acc": []}
+    
+    # loop through training and testing steps for a number of epochs
+    for epoch in tqdm(range(epochs)):
+        train_loss, train_acc = train_step(model=model,
+                                           dataloader=train_dataloader,
+                                           loss_fn=loss_fn,
+                                           optimizer=optimizer)
+        test_loss, test_acc = test_step(model=model,
+                                        dataloader=test_dataloader,
+                                        loss_fn=loss_fn,
+                                        device=device)
+        # printou whats happening
+        print(f"Epoch: {epoch+1} | Train loss: {train_loss:.5f} | Train acc: {train_acc:.5f} | Test loss: {test_loss:.5f} | Test acc: {test_acc:.5f}")
+
+        # update results dictionary
+        results["train_loss"].append(train_loss)
+        results["train_acc"].append(train_acc)
+        results["test_loss"].append(test_loss)
+        results["test_acc"].append(test_acc)
+
+    return results
+
+# plot the loss cruves of model_0
+# get the model_0_results keys
+
+def plot_loss_curves(results: Dict[str, List[float]]) -> None:
+    """Plots training curves of a results dictionary"""
+    # get the loss values of the results dictionary (training and test)
+    loss = results["train_loss"]
+    test_loss = results["test_loss"]
+
+    # get the accuracy values of the results dictionary (training and test)
+    accuracy = results["train_acc"]
+    test_accuracy = results["test_acc"]
+
+    # figure out how many epochs there were
+    epochs = range(len(results["train_loss"]))
+
+    # setup a plot
+    plt.figure(figsize=(15, 7))
+
+    # plot loss curve
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, loss, label="training_loss")
+    plt.plot(epochs, test_loss, label="test_loss")
+    plt.title("Loss")
+    plt.xlabel("Epochs")
+    plt.legend()
+
+    # plot the accuracy
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, accuracy, label="training_accuracy")
+    plt.plot(epochs, test_accuracy, label="test_accuracy")
+    plt.title("Accuracy")
+    plt.xlabel("Epochs")
+    plt.legend()
+    plt.show()
+
+
+def plot_train_test_duplicate(model_0_df, model_1_df):
+    # plot train loss
+    plt.subplot(2, 2, 1)
+    plt.plot(epochs, model_0_df["train_loss"], label="Model 0")
+    plt.plot(epochs, model_1_df["train_loss"], label="Model 1")
+    plt.title("Train Loss")
+    plt.xlabel("Epochs")
+    plt.legend()
+    #plt.show()
+
+    # plot test loss
+    plt.subplot(2, 2, 2)
+    plt.plot(epochs, model_0_df["test_loss"], label="Model 0")
+    plt.plot(epochs, model_1_df["test_loss"], label="Model 1")
+    plt.title("Test Loss")
+    plt.xlabel("Epochs")
+    plt.legend()
+    #plt.show()
+
+    # accuracy
+    plt.subplot(2, 2, 3)
+    plt.plot(epochs, model_0_df["train_acc"], label="Model 0")
+    plt.plot(epochs, model_1_df["train_acc"], label="Model 1")
+    plt.title("Train Acc")
+    plt.xlabel("Epochs")
+    plt.legend()
+
+    # accuracy
+    plt.subplot(2, 2, 4)
+    plt.plot(epochs, model_0_df["test_acc"], label="Model 0")
+    plt.plot(epochs, model_1_df["test_acc"], label="Model 1")
+    plt.title("Test Acc")
+    plt.xlabel("Epochs")
+    plt.legend()
+    plt.show()
+#########################################################################################################
+# set random seeds
+torch.manual_seed(42)
+torch.mps.manual_seed(42)
+
+# set number of epochs 
+NUM_EPOCHS = 5
+
+# recreate an instance of TinyVGG
+model_0 = TinyVGG(input_shape=3, # number of color channels
+                  hidden_units=10, # number of hidden units in a conv layer
+                  output_shape=len(class_names)).to(device) # number of classes in the data
+
+# setup loss function and optimizer
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model_0.parameters(), lr=0.001)
+
+# start the timer 
+from timeit import default_timer as timer
+start_time = timer()
+
+# train model_0
+model_0_results = train(model=model_0,
+                        train_dataloader=train_dataloader_simple,
+                        test_dataloader=test_dataloader_simple,
+                        optimizer=optimizer,
+                        loss_fn=loss_fn,
+                        epochs=NUM_EPOCHS)
+# end the timer
+end_timer = timer()
+print(f"Time taken to train model_0: {end_timer - start_time:.3f} seconds")
+
+
+#plot_loss_curves(model_0_results)
+
+"""
+Dealing with overfitting
+get more data:            giver a model more of a chance to learn patterns between samples
+data argumentation:       increase the diversity of your training dataset without collecting more data. Increased diversity forces a model to learn more generalisation patterns.
+better data:              not all data samples are created euqally. Removing poor samples from or adding better samples to you dataset can improve your model performance.
+use transfer learning:    use the patterns learned by a model trained on a large dataset to help your model learn patterns on your own dataset.
+simplify your model:      the less parameters a model has, the less patterns it can learn. If your model is learning too many patterns, it might be overfitting.
+user learning rate decay: gradually reduce the learning rate as the model trains. This allows the model to make large updates in the beginning of training (helping it find patterns) and smaller updates later on (helping it fine-tune the patterns).
+use early stopping:       training for too long can cause a model to learn patterns on the training data which don't generalise to the test data. Early stopping stops a model from training once it stops improving on the test set.
+"""
+
+# model_1 TinyVGG with data augmentation
+# create trining trnasforms with data TrivialAugmentWide
+train_transform_trivial = transforms.Compose([
+    transforms.Resize((64, 64)),
+    transforms.TrivialAugmentWide(num_magnitude_bins=31),
+    transforms.ToTensor()
+    ])
+
+test_transform_simple = transforms.Compose([ # we dont do data argumentation on the test data
+    transforms.Resize((64, 64)),
+    transforms.ToTensor()
+    ])
+
+# create train and test 'Datasets' and 'DataLoaders' with data argumentation
+# turn image folder into Datasets
+train_data_augmented = datasets.ImageFolder(root=train_dir,
+                                            transform=train_transform_trivial)
+test_data_augmented = datasets.ImageFolder(root=test_dir,
+                                           transform=test_transform_simple)
+
+# turn our datasets into dataloaders
+BATCH_SIZE = 32
+NUM_WORKERS = 0
+
+torch.manual_seed(42)
+train_dataloader_augmented = DataLoader(dataset=train_data_augmented,
+                                        batch_size=BATCH_SIZE,
+                                        shuffle=True,
+                                        num_workers=NUM_WORKERS)
+
+test_dataloader_simple = DataLoader(dataset=test_data_augmented,
+                                        batch_size=BATCH_SIZE,
+                                        shuffle=False,
+                                        num_workers=NUM_WORKERS)
+# construct and train model_1
+model_1 = TinyVGG(input_shape=3,
+                    hidden_units=10,
+                    output_shape=len(train_data_augmented.classes)).to(device)
+
+# setup loss function and optimizer
+# set random seeds
+torch.manual_seed(42)
+torch.mps.manual_seed(42)
+
+NUM_EPOCHS = 5 # number of epochs 
+loss_fn = nn.CrossEntropyLoss() # loss function
+optimizer = torch.optim.Adam(model_1.parameters(), lr=0.001) # optimizer
+start_time = timer() 
+
+# train model_1
+model_1_results = train(model=model_1,
+                        train_dataloader=train_dataloader_augmented,
+                        test_dataloader=test_dataloader_simple,
+                        optimizer=optimizer,
+                        loss_fn=loss_fn,
+                        epochs=NUM_EPOCHS,
+                        device=device)
+end_timer = timer()
+#plot_loss_curves(model_1_results)
+print(f"Time taken to train model_1: {end_timer - start_time:.3f} seconds.")
+
+# compare model results
+model_0_df = pd.DataFrame(model_0_results)
+model_1_df = pd.DataFrame(model_1_results)
+
+# setup a plot
+plt.figure(figsize=(15, 10))
+
+# get number of epochs
+epochs = range(len(model_0_df))
+# plot_train_test_duplicate(model_0_df, model_1_df)
+
+# setup custom image path
+custom_image_path = data_path / "04-pizza-dad.jpeg"
+
+# load in a custom image with pytorch
+# make sure taht the iamge is in the same formata as the data of the model
+"""
+    in tensor form with datatype torch.float32
+    of shape 64 x 64 x 64
+    on the right device
+"""
+custom_image = torchvision.io.read_image(str(custom_image_path)).type(torch.float32)
+custom_image = custom_image / 255 # normalize the image
+
+print(f"Custom image shape: {custom_image.shape}")
+print(f"Custom image datatype: {custom_image.dtype}")
+print(f"Custom image tensor: \n {custom_image}")
+# plt.imshow(custom_image_uint8.permute(1, 2, 0))
+# plt.axis(False)
+# plt.show()
+# making a prediction on a custom image with a trained pytorch model
+# try to make a prediction on a image in uint8 format
+#model_1.eval()
+#with torch.inference_mode():
+#    model_1(custom_image.to(device))
+
+# create transform pipeline to resize image
+
+
+# transform target image
+# Create transform pipleine to resize image
+custom_image_transform = Resize(size=(64, 64), antialias=True)
+
+# Transform target image
+custom_image_transformed = custom_image_transform(custom_image)
+
+# Print out original shape and new shape
+print(f"Original shape: {custom_image.shape}")
+print(f"New shape: {custom_image_transformed.shape}")
+
+"""Shape error bellow:"""
+# (mpsFileLoc): /AppleInternal/Library/BuildRoots/d9889869-120b-11ee-b796-7a03568b17ac/Library/Caches/com.apple.xbs/Sources/MetalPerformanceShadersGraph/
+# mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm:39:0: error: 'mps.matmul' op contracting dimensions differ 169 & 1690
+
+model_1.eval()
+with torch.inference_mode():
+    custom_image_pred = model_1(custom_image_transformed.unsqueeze(0).to(device))
+"""
+    To make a prediction on a custom image we had to:
+        load the image and tur it into a tensor
+        make sure the image was the same datatype as the model (torch.float32)
+        make sure the was the same shape as the data the model was trained on (3, 64, 64) with a batch size (1, 3, 64, 64)
+        make sure the image was on the same device as our model
+"""
+
+# convert logits -> prediction probabilities
+custom_image_pred_probs = torch.softmax(custom_image_pred, dim=1)
+
+# convert prediction probabilities -> prediction labels
+custom_image_pred_labels = torch.argmax(custom_image_pred_probs, dim=1)
+print(class_names[custom_image_pred_labels])
+
+# putting custom image prediction together: building a function
+def pred_and_plot_image(model: torch.nn.Module,
+                        image_path: str,
+                        class_names: List[str] = None,
+                        transform=None,
+                        device=device):
+    """Makes a prediction on a target image with a trained model and plotes the imate and prediction."""
+    # load target image
+    target_image = torchvision.io.read_image(str(image_path)).type(torch.float32)
+
+    # divide the image pixel values by 255 to get them between [0, 1]
+    target_image = target_image / 255.
+
+    # transform if necessary
+    if transform:
+        target_image = transform(target_image)
+    
+    # make sure the model is on the target device
+    model.to(device)
+
+    # turn on eval/inference mode and make prediction
+    model.eval()
+    with torch.inference_mode():
+        # add an extra dimension to the image (his is the batch dimension, the model will predict on batches of 1x image)
+        target_image = target_image.unsqueeze(0)
+        
+        # make predicitoon on the image with an extra dimension
+        target_image_pred = model(target_image.to(device))
+    
+    # convert logits -> prediction probabilities
+    target_image_pred_probs = torch.softmax(target_image_pred, dim=1)
+
+    # convert prediction probabilities -> prediction labels
+    target_image_pred_labels = torch.argmax(target_image_pred_probs, dim=1)
+
+    # plot the image alongside the predicction and prediction probability
+    plt.imshow(target_image.squeeze().permute(1, 2, 0)) # remove batch dimension and rearrange shape to be HWC
+    if class_names:
+        title = f"Pred: {class_names[target_image_pred_labels.cpu()]}  |  Prob: {target_image_pred_probs.max().cpu():.3f}"
+    else:
+        title = f"Pred: {target_image_pred_labels}  |  Prob: {target_image_pred_probs.max().cpu():.3f}"
+    plt.title(title)
+    plt.axis(False)
+    plt.show()
+
+# pred on our custom image
+pred_and_plot_image(model=model_1,
+                    image_path=custom_image_path,
+                    class_names=class_names,
+                    transform=custom_image_transform,
+                    device=device)
