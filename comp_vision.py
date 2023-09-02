@@ -12,6 +12,7 @@ from torch import nn
 import matplotlib.pyplot as plt
 from torchvision.transforms import ToTensor
 from torchvision import datasets
+device = "mps" if True else "cuda" if torch.cuda.is_available() else "cpu"
 
 # getting a dataset
 # setup training data
@@ -110,11 +111,11 @@ x = train_features_batch[0]
 output = flatten_model(x) # prerform forward pass
 
 # print out what happened
-print(f"Shape before flattering: {x.shape} -> [color_channels, height, width]")
-print(f"Shape before flattering: {output.shape} -> [color_channels, height * width]")
+#print(f"Shape before flattering: {x.shape} -> [color_channels, height, width]")
+#print(f"Shape before flattering: {output.shape} -> [color_channels, height * width]")
 
 from torch import nn
-class FashioMINSTModelV0(nn.Module):
+class FashionMINSTModelV0(nn.Module):
     def __init__(self, input_shape: int, hidden_units: int, output_shape: int):
         super().__init__()
         self.layer_stack = nn.Sequential(
@@ -131,7 +132,7 @@ torch.manual_seed(42)
 
 # print((x.shape[1] * x.shape[2]))
 # setup model with input parameters
-model_0 = FashioMINSTModelV0(
+model_0 = FashionMINSTModelV0(
     input_shape = (x.shape[1] * x.shape[2]), # 28 * 28
     hidden_units=10,
     output_shape=len(class_names) # one for every class
@@ -172,7 +173,7 @@ torch.manual_seed(42)
 train_time_start_on_cpu = timer()
 
 # set the number of epochs (we ill keep this small for faster training time)
-epochs = 5
+epochs = 3
 
 # create a training and test loop
 for epoch in tqdm(range(epochs)):
@@ -420,7 +421,7 @@ from timeit import default_timer as timer
 train_time_start_on_gpu = timer()
 
 # set epochs
-epochs = 0 # 3
+epochs = 3
 
 # create a optimization and evaluation loop using train_step() and test_step()
 for epoch in tqdm(range(epochs)):
@@ -449,4 +450,271 @@ model_1_results = eval_model(model=model_1,
                              accuracy_fn=accuracy_fn,
                              device=device)
                              
-print(model_1_results)
+#print(model_1_results)
+####################################################################################################################################################
+####################################################################################################################################################
+# Create a convolutional neural network 
+class FashionMNISTModelV2(nn.Module):
+    """
+    Model architecture copying TinyVGG from: 
+    https://poloclub.github.io/cnn-explainer/
+    """
+    def __init__(self, input_shape: int, hidden_units: int, output_shape: int):
+        super().__init__()
+        self.block_1 = nn.Sequential(
+            nn.Conv2d(in_channels=input_shape, 
+                      out_channels=hidden_units, 
+                      kernel_size=3, # how big is the square that's going over the image?
+                      stride=1, # default
+                      padding=1),# options = "valid" (no padding) or "same" (output has same shape as input) or int for specific number 
+            nn.ReLU(),
+            nn.Conv2d(in_channels=hidden_units, 
+                      out_channels=hidden_units,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2,
+                         stride=2) # default stride value is same as kernel_size
+        )
+        self.block_2 = nn.Sequential(
+            nn.Conv2d(hidden_units, hidden_units, 3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(hidden_units, hidden_units, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            # Where did this in_features shape come from? 
+            # It's because each layer of our network compresses and changes the shape of our inputs data.
+            nn.Linear(in_features=hidden_units*7*7, 
+                      out_features=output_shape)
+        )
+    
+    def forward(self, x: torch.Tensor):
+        x = self.block_1(x)
+        #print("Output shape of block_1 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX: {x.shape}")
+        x = self.block_2(x)
+        #print("Output shape of block_2 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX: {x.shape}")
+        x = self.classifier(x)
+        #print("Output shape of classififier XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX: {x.shape}")
+        return x
+
+torch.manual_seed(42)
+model_2 = FashionMNISTModelV2(input_shape=1, 
+    hidden_units=10, 
+    output_shape=len(class_names)).to(device)
+
+
+torch.manual_seed(42)
+
+# Create sample batch of random numbers with same size as image batch
+images = torch.randn(size=(32, 3, 64, 64)) # [batch_size, color_channels, height, width]
+test_image = images[0] # get a single image for testing
+# print(f"Image batch shape: {images.shape} -> [batch_size, color_channels, height, width]")
+print(f"Single image shape: {test_image.shape} -> [color_channels, height, width]") 
+# print(f"Single image pixel values:\n{test_image}")
+
+torch.manual_seed(42)
+
+# Create a convolutional layer with same dimensions as TinyVGG 
+# (try changing any of the parameters and see what happens)
+conv_layer = nn.Conv2d(in_channels=3,
+                       out_channels=10,
+                       kernel_size=3,
+                       stride=1,
+                       padding=0) # also try using "valid" or "same" here 
+
+# Pass the data through the convolutional layer
+conv_layer(test_image) # Note: If running PyTorch <1.11.0, this will error because of shape issues (nn.Conv.2d() ex
+
+# Add extra dimension to test image
+test_image.unsqueeze(dim=0).shape
+
+# Pass test image with extra dimension through conv_layer
+conv_layer(test_image.unsqueeze(dim=0)).shape
+
+torch.manual_seed(42)
+# Create a new conv_layer with different values (try setting these to whatever you like)
+conv_layer_2 = nn.Conv2d(in_channels=3, # same number of color channels as our input image
+                         out_channels=10,
+                         kernel_size=(5, 5), # kernel is usually a square so a tuple also works
+                         stride=2,
+                         padding=0)
+
+# Pass single image through new conv_layer_2 (this calls nn.Conv2d()'s forward() method on the input)
+conv_layer_2(test_image.unsqueeze(dim=0)).shape
+
+# Check out the conv_layer_2 internal parameters
+print(conv_layer_2.state_dict())
+
+# Get shapes of weight and bias tensors within conv_layer_2
+print(f"conv_layer_2 weight shape: \n{conv_layer_2.weight.shape} -> [out_channels=10, in_channels=3, kernel_size=5, kernel_size=5]")
+print(f"\nconv_layer_2 bias shape: \n{conv_layer_2.bias.shape} -> [out_channels=10]")
+
+# Print out original image shape without and with unsqueezed dimension
+print(f"Test image original shape: {test_image.shape}")
+print(f"Test image with unsqueezed dimension: {test_image.unsqueeze(dim=0).shape}")
+
+# Create a sample nn.MaxPoo2d() layer
+max_pool_layer = nn.MaxPool2d(kernel_size=2)
+
+# Pass data through just the conv_layer
+test_image_through_conv = conv_layer(test_image.unsqueeze(dim=0))
+print(f"Shape after going through conv_layer(): {test_image_through_conv.shape}")
+
+# Pass data through the max pool layer
+test_image_through_conv_and_max_pool = max_pool_layer(test_image_through_conv)
+print(f"Shape after going through conv_layer() and max_pool_layer(): {test_image_through_conv_and_max_pool.shape}")
+
+torch.manual_seed(42)
+# Create a random tensor with a similiar number of dimensions to our images
+random_tensor = torch.randn(size=(1, 1, 2, 2))
+print(f"Random tensor:\n{random_tensor}")
+print(f"Random tensor shape: {random_tensor.shape}")
+
+# Create a max pool layer
+max_pool_layer = nn.MaxPool2d(kernel_size=2) # see what happens when you change the kernel_size value 
+
+# Pass the random tensor through the max pool layer
+max_pool_tensor = max_pool_layer(random_tensor)
+print(f"\nMax pool tensor:\n{max_pool_tensor} <- this is the maximum value from random_tensor")
+print(f"Max pool tensor shape: {max_pool_tensor.shape}")
+
+# plt.imshow(image.squeeze(), cmap="gray")
+# plt.show()
+
+rand_image_tensor = torch.randn(size=(1, 28, 28))
+print(rand_image_tensor.shape)
+model_2(rand_image_tensor.unsqueeze(dim=0).to(device))
+
+# setup a loss function and optimizer for 'model_2'
+from helper_function import accuracy_fn
+
+loss_fn = nn.CrossEntropyLoss() # because is a multi-class classification problem
+optimizer = torch.optim.SGD(params=model_2.parameters(), lr=0.1)
+
+# training and testint 'model_2' using our training and test functions
+torch.manual_seed(42)
+torch.mps.manual_seed(42)
+
+# measure time
+from timeit import default_timer as timer
+train_time_start_model_2 = timer()
+
+# train and test model
+epochs = 3
+for epoch in tqdm(range(epochs)):
+    print(f"Epoch: {epoch}\n---------")
+    train_step(model=model_2,
+               data_loader=train_dataloader,
+               loss_fn=loss_fn,
+               optimizer=optimizer,
+               accutracy_fn=accuracy_fn,
+               device=device)
+    test_step(model=model_2,
+              data_loader=test_dataloader,
+              loss_fn=loss_fn,
+              accuracy_fn=accuracy_fn,
+              device=device)
+train_time_end_model_2 = timer()
+total_train_time_model_2 = print_train_time(train_time_start_model_2,
+                                            train_time_end_model_2,
+                                            device=device)
+# get model 2 results
+model_2_results = eval_model(model=model_2,
+                             data_loader=test_dataloader,
+                             loss_fn=loss_fn,
+                             accuracy_fn=accuracy_fn,
+                             device=device)
+print(model_2_results)
+
+import pandas as pd
+compare_results = pd.DataFrame([model_0_results, 
+                                model_1_results, 
+                                model_2_results])
+
+print(compare_results) 
+
+# add training time to results comparison
+compare_results["training_time"] = [total_train_time_model_0,
+                                    total_train_time_model_1, 
+                                    total_train_time_model_2]
+print(compare_results)
+
+# visualize model results
+compare_results.set_index("model_name")["model_acc"].plot(kind="barh")
+plt.xlabel("Accuracy (%)")
+plt.ylabel("Model")
+plt.show()
+
+# make and evaluate random predictions with best model
+def make_predictions(mode: torch.nn.Module,
+                     data: list,
+                     device: torch.device = device):
+    pred_probs = []
+    model.to(device)
+    model.eval()
+    with torch.inference_mode():
+        for sample in data:
+            # prepare the sample *add a batch dimension and pass to target device)
+            sample = torch.unsqueeze(sample, dim=0).to(device)  # add a batch dimension
+            
+            # forward pass (model outputs raw logits)
+            pred_logit = model(sample)
+
+            # get prediction probability (logit -> prediction probability)
+            pred_prob = torch.softmax(pred_logit.squeeze(), dim=0)
+
+            # get pred_prob off the GPU for further calculations
+            pred_probs.append(pred_prob.cpu())
+
+        # stack the pred_probs to turn list into a tensor
+        return torch.stack(pred_probs)
+    
+import random
+random.seed(42)
+test_samples = []
+test_labels = []
+
+for sample, label in random.sample(list(test_data), k=9):
+    test_samples.append(sample)
+    test_labels.append(label)
+
+# make predictions
+pred_probs = make_predictions(model =model_2,data=test_samples)
+# view first two prediction probabilities
+#print(pred_probs[:2])
+
+# convert prediction probabilities to labels
+pred_classes = pred_probs.argmax(dim=1)
+#print(pred_classes)
+
+# plot predictions
+plt.figure(figsize=(9, 9))
+nrows = 3
+ncols = 3
+for i, sample in enumerate(test_samples):
+    # create subplot
+    plt.subplot(nrows, ncols, i+1)
+
+    # plot the targe image
+    plt.imshow(sample.squeeze(), cmap="gray")
+
+    # find the prediction (in text form, e.g "sandal")
+    pred_label = class_names[pred_classes[i]]
+    
+    # get the truth label (in text form)
+    truth_label = class_names[test_labels[i]]
+
+    # create a title for the plot
+    title_text = f"Pred: {pred_label}, Truth: {truth_label}"
+
+    # check for euqality between pred and truth and change color of litle text
+    if pred_label == truth_label:
+        plt.title(title_text, color="g")
+    else:
+        plt.title(title_text, color="r")
+    plt.axis(False)
+plt.show()  
