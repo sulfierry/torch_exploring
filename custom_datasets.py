@@ -198,7 +198,7 @@ train_list, train_dict = train_data.classes, train_data.class_to_idx
 
 # setup path for target directory
 target_directory = train_dir
-print(f"Target directory: {target_directory}")
+# print(f"Target directory: {target_directory}")
 
 # get the class names from the target directory
 class_names_found = sorted([entry.name for entry in list(os.scandir(target_directory)) if entry.is_dir()])
@@ -340,7 +340,7 @@ def display_random_images(dataset: torch.utils.data.Dataset,
             title = f"Class: {classes[targ_label]}"
             if display_shape:
                 title += f"\nShape: {targ_image_adjust.shape}"
-        plt.title(title)
+        plt.title(title, fontsize=5)
     plt.show()
 
 # display random images from the ImageFolderCustom Dataset
@@ -349,9 +349,147 @@ def display_random_images(dataset: torch.utils.data.Dataset,
 #                       n=5,
 #                       display_shape=True,
 #                       seed=None)
-# doisplay random images from the ImageFolderCustom Dataset
-display_random_images(train_data_custom,
-                      n=20,
-                      classes=class_names,
-                      seed=None)
 
+# display random images from the ImageFolderCustom Dataset
+# display_random_images(train_data_custom,
+#                       n=10,
+#                       classes=class_names,
+#                       seed=None)
+
+# Turn custom loaded imates into 'DataLoader'
+from torch.utils.data import DataLoader
+BATCH_SIZE = 64
+NUM_WORKERS = 0
+train_dataloader_custom = DataLoader(dataset=train_data_custom,
+                                        batch_size=BATCH_SIZE,
+                                        num_workers=NUM_WORKERS,
+                                        shuffle=True)
+
+test_dataloader_custom = DataLoader(dataset=test_data_custom,
+                                        batch_size=BATCH_SIZE,
+                                        num_workers=NUM_WORKERS,
+                                        shuffle=False)
+
+# get image and label from custom dataloader
+img_custom, label_custom = next(iter(train_dataloader_custom))
+
+# data argumentation is the process of artificially adding diversity to your training data
+# lets look a trivialaugment
+
+train_transform = transforms.Compose([
+    transforms.Resize((224, 224)), # commom size in image classifciation
+    transforms.TrivialAugmentWide(num_magnitude_bins=31), # TrivialAugmentWide is a custom transform from the timm library
+    transforms.ToTensor()
+    ])
+test_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor()
+    ])
+
+# get all image paths
+image_path_list = list(image_path.glob("*/*/*.jpg"))
+
+# # plot random images
+# plot_transformed_images(image_paths=image_path_list,
+#                         transform=train_transform,
+#                         n=3,
+#                         seed=None)
+
+# model_0: TinyVGG without data augmentation
+# creating transforms and loading data for model_0
+simple_transform = transforms.Compose([
+    transforms.Resize((63, 64)),
+    transforms.ToTensor()
+])
+
+# load and transform data
+train_data_simple = datasets.ImageFolder(root=train_dir,
+                                         transform=simple_transform)
+test_data_simple = datasets.ImageFolder(root=test_dir,
+                                        transform=simple_transform)
+# turn the datasets into DataLoaders
+
+# setup batch size and number of workers
+BATCH_SIZE = 32
+NUM_WORKERS = 0 # os.cpu_count()
+
+# create dataloaders
+train_dataloader_simple = DataLoader(dataset=train_data_simple,
+                                     batch_size=BATCH_SIZE,
+                                     shuffle=True,
+                                     num_workers=NUM_WORKERS)
+
+test_dataloader_simple = DataLoader(dataset=test_data_simple,
+                                    batch_size=BATCH_SIZE,
+                                    shuffle=True,
+                                    num_workers=NUM_WORKERS)
+# create TinyVGG model class
+class TinyVGG(nn.Module):
+    """Model architecture copying TinyVGG from CNN explainer."""
+    def __init__(self, input_shape: int,
+                 hidden_units: int,
+                 output_shape: int) -> None:
+        super().__init__()
+        self.conv_block_1 = nn.Sequential(
+            nn.Conv2d(in_channels=input_shape,
+                      out_channels=hidden_units,
+                      kernel_size=3,
+                      stride=1,
+                      padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=hidden_units,
+                      out_channels=hidden_units,
+                      kernel_size=3,
+                      stride=1,
+                      padding=0),
+
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2,
+                         stride=2) # default stride value is same as kernel_size
+        )
+        self.conv_block_2 = nn.Sequential(
+            nn.Conv2d(in_channels=hidden_units,
+                      out_channels=hidden_units,
+                      kernel_size=3,
+                      stride=1,
+                      padding=0),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=hidden_units,
+                      out_channels=hidden_units,
+                      kernel_size=3,
+                      stride=1,
+                      padding=0),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(in_features=hidden_units*12*13,
+                      out_features=output_shape)
+        )
+
+    def forward(self, x):
+        x = self.conv_block_1(x)
+        print(x.shape)
+        x = self.conv_block_2(x)
+        print(x.shape)
+        x = self.classifier(x)
+        print(x.shape)
+        return x # self.classifier(self.conv_block_2(self.conv_block_1(x))) # benefits from operator fusion
+
+torch.manual_seed(42)
+model_0 = TinyVGG(input_shape=3, # number of color channels in image data
+                  hidden_units=10, # number of hidden units in a conv layer
+                  output_shape=len(class_names)).to(device) # number of classes in the data
+print(model_0)
+
+# try a forward pass on a single image (to test the model)
+# get a single image batch
+image_batch, label_batch = next(iter(train_dataloader_simple))
+
+# try a forward pass
+print(model_0(image_batch.to(device)))
+
+from torchinfo import summary
+
+summary(model_0, input_size=(1, 3, 63, 64))
