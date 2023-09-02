@@ -718,3 +718,41 @@ for i, sample in enumerate(test_samples):
 plt.show()  
 
 # making a confusion matrix for further prediction evaluation
+# make predictions with our trained model on the test dataset
+# make a confusion matrix 'torchmetrics.functional.confusion_matrix()'
+# plot the confusion matrix using 'mlxtend.plotting.plot_confusion_matrix()'
+
+# Make predictions with trained model
+#y_preds = []
+model_2.eval()# Primeiro, inicialize y_preds como uma lista vazia antes do loop.
+y_preds_list = []
+
+with torch.inference_mode():
+    for X, y in tqdm(test_dataloader, desc="Making predictions..."):
+        # send the data and targets to target device
+        X, y = X.to(device), y.to(device)
+
+        # do the forward pass
+        y_logit = model_2(X)
+
+        # turn prediction from logits -> prediction probabilities -> prediction labels
+        y_preds = torch.softmax(y_logit, dim=1).argmax(dim=1)
+
+        # put prediction on CPU and append to the list
+        y_preds_list.append(y_preds.cpu())
+
+# Se você quiser converter sua lista de tensores de volta para um tensor no final:
+
+# concatenate list of prediciton into a tensor
+print(f"y_preds: {y_preds}")
+y_pred_tensor = torch.cat(y_preds_list)
+import os 
+# see if required packages are installed and if not, install them
+try:
+    import torchmetrics, mlxtend
+    print(f"mlxtend version: {mlxtend.__version__}")
+    assert int(mlxtend.__version__.split(".")[1]) >= 19, "mlxtendo version should be 0.19.0 or higher"
+except:
+    os.sys("pip3 install torchmetrics mlxtend")
+    import torchmetrics, mlxtend
+    print(f"mlxtend version: {mlxtend.__version__}")
