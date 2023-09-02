@@ -176,7 +176,7 @@ epochs = 5
 
 # create a training and test loop
 for epoch in tqdm(range(epochs)):
-    print(f"Epoch: {epoch}\n----")
+    print(f"Epoch: {epoch}\n----__")
     # training
     train_loss = 0
     # add a loop to loop through the training batches
@@ -263,4 +263,190 @@ def eval_model(model: torch.nn.Module,
 # calculate model 0 results on test dataset
 model_0_results = eval_model(model_0, test_dataloader, loss_fn, accuracy_fn)
 
-print(model_0_results)
+#print(model_0_results)
+
+
+############# MODEL 1 ############################################
+
+# turn datasets into iterables (batches)
+train_dataloader = DataLoader(train_data, batch_size=BATCH_SIZE, shuffle=True)
+train_features_batch, train_labels_batch = next(iter(train_dataloader))
+
+test_dataloader = DataLoader(test_data, batch_size=BATCH_SIZE, shuffle=False)
+torch.manual_seed(42)
+def eval_model(model: torch.nn.Module,
+               data_loader: torch.utils.data.DataLoader,
+               loss_fn: torch.nn.Module,
+               accuracy_fn,
+               device=device):
+    """returns a dictionary contaning the results of model predicting on data_loader"""
+    loss, acc = 0, 0
+    model.eval()
+    with torch.inference_mode():
+        for X, y in tqdm(data_loader):
+            X, y = X.to(device), y.to(device)
+            # make predictions
+            y_pred = model(X)
+            # accumulate the loss and acc values per batch
+            loss += loss_fn(y_pred, y)
+            acc += accuracy_fn(y, y_pred.argmax(dim=1)) # argmax to get the index of the max value
+
+        # scale loss and acc to find the average loss/acc per batch
+        loss /= len(data_loader)
+        acc /= len(data_loader)
+    return {"model_name": model.__class__.__name__, # only works when model was created with a class
+            "model_loss": loss.item(),
+            "model_acc": acc}
+
+# building a better model with non-linearity
+class FashioMINSTModelV1(nn.Module):
+    def __init__(self,
+                 input_shape: int,
+                 hidden_units: int,
+                 output_shape: int):
+        super().__init__()
+        self.layer_stack = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(in_features=input_shape,
+                       out_features=hidden_units),
+            nn.ReLU(),
+            nn.Linear(in_features=hidden_units,
+                       out_features=output_shape),
+            nn.ReLU()
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.layer_stack(x)
+
+class_names = train_data.classes
+
+# create an instance of model_1
+torch.manual_seed(42)
+model_1 = FashioMINSTModelV1(input_shape=train_features_batch.shape[2]*train_features_batch.shape[3],
+                             hidden_units=128,
+                             output_shape=len(class_names)).to(device)
+ 
+# setup loss, optimizer and evaluation metrics
+from helper_function import accuracy_fn
+loss_fn = nn.CrossEntropyLoss() # measure how wrong the model is
+optmizer = torch.optim.SGD(params=model_1.parameters(), lr=0.1) # update models parameters to reduce the loss
+#acc_fn = accuracy_fn # calculate accuracy of model
+
+# functionizing training and evaluating/testing loops
+def train_step(model: torch.nn.Module,
+               data_loader: torch.utils.data.DataLoader,
+               loss_fn: torch.nn.Module,
+               optimizer: torch.optim.Optimizer,
+               accutracy_fn,
+               device: torch.device = device):
+    
+    """Performs a training with model trying to learn on data_loader."""
+    train_loss, train_acc = 0, 0
+
+    # Put model into training mode
+    model.train()
+
+    # add a loop to loop through the training batches
+    for batch, (X, y) in enumerate(data_loader):
+        # put data on target device
+        X, y = X.to(device), y.to(device)
+
+        # forward pass
+        y_pred = model(X)
+
+        # calculate loss
+        loss = loss_fn(y_pred, y)
+        train_loss += loss
+        train_acc += accuracy_fn(y_true=y, y_pred=y_pred.argmax(dim=1))
+
+        # optimizer zero grad
+        optimizer.zero_grad()
+
+        # loss backward
+        loss.backward()
+        
+        # optimizer step (update the model parameters once per batch)
+        optimizer.step()
+
+    # divide total train loss and acc by length of train dataloader
+    train_loss /= len(data_loader)
+    train_acc /= len(data_loader)
+    print(f"Train loss: {train_loss:.5f}, Train acc: {train_acc:.2f}%")
+
+
+
+
+def test_step(model: torch.nn.Module,
+              data_loader: torch.utils.data.DataLoader,
+              loss_fn: torch.nn.Module,
+              accuracy_fn,
+              device: torch.device = device):
+    """Performs a testing loop step on model goig over data_loader."""
+    test_loss, test_acc = 0, 0
+    
+    # put the model in eval mode
+    model.eval()
+
+    # turn on inference mode context manager
+    with torch.inference_mode():
+        for X, y in data_loader:
+            # sendo the data to the target device
+            X, y = X.to(device), y.to(device)
+
+            # forward pass (output raw logits)
+            test_pred = model(X)
+
+            # calculate the loss
+            test_loss += loss_fn(test_pred, y)
+            test_acc += accuracy_fn(y_true=y, y_pred=test_pred.argmax(dim=1)) # go from logits -> prediction labels
+
+        # Adjust merics and print out
+        test_loss /= len(data_loader)
+        test_acc /= len(data_loader)
+        print(f"Test loss: {test_loss:.5f}, Test acc: {test_acc:.2f}%")
+
+def print_train_time(start: float,
+                     end: float,
+                     device: torch.device = None):
+    """Prints difference between start and end time."""
+    total_time = end - start
+    print(f"Training time on {device}: {total_time:.3f} seconds")
+    return total_time  
+
+torch.manual_seed(42)
+
+# measure time
+from timeit import default_timer as timer
+train_time_start_on_gpu = timer()
+
+# set epochs
+epochs = 0 # 3
+
+# create a optimization and evaluation loop using train_step() and test_step()
+for epoch in tqdm(range(epochs)):
+    print(f"Epoch: {epoch} \n---------")
+    train_step(model=model_1,
+               data_loader=train_dataloader,
+               loss_fn=loss_fn,
+               optimizer=optmizer,
+               accutracy_fn=accuracy_fn,
+               device=device)
+    
+    test_step(model=model_1,
+              data_loader=test_dataloader,
+              loss_fn=loss_fn,
+              accuracy_fn=accuracy_fn,
+              device=device)
+    
+train_time_end_on_cgouy = timer()
+total_train_time_model_1 = print_train_time(train_time_start_on_gpu,
+                                            train_time_end_on_cgouy,
+                                            device)
+
+model_1_results = eval_model(model=model_1,
+                             data_loader=test_dataloader,
+                             loss_fn=loss_fn,
+                             accuracy_fn=accuracy_fn,
+                             device=device)
+                             
+print(model_1_results)
