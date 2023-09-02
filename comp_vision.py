@@ -12,7 +12,8 @@ from torch import nn
 import matplotlib.pyplot as plt
 from torchvision.transforms import ToTensor
 from torchvision import datasets
-device = "mps" if True else "cuda" if torch.cuda.is_available() else "cpu"
+
+device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 
 # getting a dataset
 # setup training data
