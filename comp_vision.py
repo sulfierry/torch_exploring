@@ -744,7 +744,6 @@ with torch.inference_mode():
 # Se você quiser converter sua lista de tensores de volta para um tensor no final:
 
 # concatenate list of prediciton into a tensor
-print(f"y_preds: {y_preds}")
 y_pred_tensor = torch.cat(y_preds_list)
 import os 
 # see if required packages are installed and if not, install them
@@ -756,3 +755,59 @@ except:
     os.sys("pip3 install torchmetrics mlxtend")
     import torchmetrics, mlxtend
     print(f"mlxtend version: {mlxtend.__version__}")
+
+from torchmetrics import ConfusionMatrix
+from mlxtend.plotting import plot_confusion_matrix
+
+# setup confusion instance and compare  predicitions to target
+confmat = ConfusionMatrix(num_classes=len(class_names), task='multiclass')
+confmat_tensor = confmat(preds=y_pred_tensor, target=test_data.targets)
+
+# plot the confusion matrix
+fig, ax = plot_confusion_matrix(conf_mat=confmat_tensor.numpy(),
+                                class_names=class_names,
+                                figsize=(10, 10))
+plt.show()
+
+# save and load best performing model
+from pathlib import Path
+
+MODEL_PATH = Path("models")
+MODEL_PATH.mkdir(parents=True, exist_ok=True)
+
+# create model save
+MODEL_NAME = "03_pytorch_computer_vision_model_2.pth"
+MODEL_SAVE_PATH = MODEL_PATH / MODEL_NAME
+
+# save model state dict
+torch.save(model_2.state_dict(), MODEL_SAVE_PATH)
+torch.save(obj=model_2.state_dict(), f=MODEL_SAVE_PATH)
+
+# create a new instance
+torch.manual_seed(42)
+loaded_model_2 = FashionMNISTModelV2(input_shape=1, # number of color channels
+                                    hidden_units=10,
+                                    output_shape=len(class_names)) # number of hidden units)
+# load in the save state_dict()
+loaded_model_2.load_state_dict(torch.load(MODEL_SAVE_PATH))
+
+# send the model to the target device
+loaded_model_2.to(device)
+print(loaded_model_2)
+
+print(f"Reference {model_2_results}")
+# Evaluate loaded model
+torch.manual_seed(42)
+
+loaded_model_2_results = eval_model(model=loaded_model_2,
+                                    data_loader=test_dataloader,
+                                    loss_fn=loss_fn,
+                                    accuracy_fn=accuracy_fn,
+                                    device=device)
+
+print(loaded_model_2_results)
+
+# check if model result are close to each other
+print(torch.isclose(torch.tensor(model_2_results["model_loss"]), 
+              torch.tensor(loaded_model_2_results["model_loss"]),
+               atol=0.01))
