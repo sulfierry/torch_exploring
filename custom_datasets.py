@@ -202,3 +202,156 @@ print(f"Target directory: {target_directory}")
 
 # get the class names from the target directory
 class_names_found = sorted([entry.name for entry in list(os.scandir(target_directory)) if entry.is_dir()])
+
+def find_classes(directory: str) -> Tuple[List[str], Dict[str, int]]:
+    """Finds the class folder name sin a target directory"""
+    # get the class names by scanning the target directory
+    classes = sorted([entry.name for entry in os.scandir(directory) if entry.is_dir()])
+
+    # raise an error if class names could not be found
+    if not classes:
+        raise FileNotFoundError(f"Could not find any class folders in {directory}.")  
+
+    # create a dicttionary of index labels 
+    class_to_idx = {class_name: i for i, class_name in enumerate(classes)}
+
+    return classes, class_to_idx
+
+find_classes(target_directory)
+"""
+1 - subclass 'torch.utils.data.Dataset'
+2 - unit our subclass with a target directory
+3 - create several atributes:
+    paths - paths of our images
+    transform - the transform wed like to use
+    classes - a list of the target classes
+    class_to_idx - a dict of the target classes mapped of our dataset
+4 - Create a function to load_images(), thhis function will open an image
+5 - Overwrite __len__ and __getitem__ to make our dataset iterable
+"""
+# write a custom dataset class
+from torch.utils.data import Dataset
+import pathlib
+# 1 - subclass torch.utils.data.Dataset
+class ImageFolderCustom(Dataset):
+    # 2 - initialize our custom dataset
+    def __init__(self, targ_dir: str, transform=None):
+        # 3 - create class atributes
+        # get all of the image paths
+        self.paths = list(pathlib.Path(targ_dir).glob("*/*.jpg"))
+        # setup transform
+        self.transform = transform
+        # Create classes and class_to_idx
+        self.classes, self.class_to_idx = find_classes(targ_dir)
+
+    # 4 - create a function to load images
+    def load_image(self, index: int) -> Image.Image:
+        """Opens an image via a path and returns it."""
+        image_path = self.paths[index]
+        return Image.open(image_path)
+
+    # 5 - overwrite __len__()
+    def __len__(self) -> int:
+        """return the total number of samples."""
+        return len(self.paths)
+    
+    # 6 - overwrite __getitem__() method to return a particular sample
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, int]:
+        """"Returns one sample of data, data and label (X, y)."""
+        img = self.load_image(index)
+        class_name = self.paths[index].parent.name # expects path in format: 'data_folder/class_name/image.jpg'
+        class_idx = self.class_to_idx[class_name]
+    
+        # transform if necessary
+        if self.transform:
+            return self.transform(img), class_idx # return data, label (X, y)
+        else:
+            return img, class_idx # return untransformed data, label (X, y)
+
+from torchvision import transforms
+
+# create a transform
+train_transforms = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.ToTensor()
+])
+
+
+test_transforms = transforms.Compose([
+    transforms.Resize((64, 64)),
+    transforms.ToTensor()
+])
+
+# test out ImageFolderCustom
+train_data_custom = ImageFolderCustom(targ_dir=train_dir, transform=train_transforms)
+test_data_custom = ImageFolderCustom(targ_dir=test_dir, transform=test_transforms)
+
+# check for equality between original ImageFolder Dataset and ImageFolderCustom Dataset
+#print(train_data_custom.classes==train_data.classes)
+#print(test_data_custom.classes==test_data.classes)
+"""
+create a function to display random images
+1 - take in a 'Dataset' and a number of other parameter such as class names and how many images to visualize
+2 - to rpevent the display getting out ofhand, lets cap the number of images to see at 10
+3 - set the random seed for reproducibility
+4 - get a list of random sample indexes from the target dataset
+5 - setup a matlpotlib plot.
+6 - Loop through the random sample images and plot them with matplotlib
+7 - Make sure the dimensions of our images line up with matplotlib (HWC)
+"""
+
+# 1 - create a function to take in a dataset
+def display_random_images(dataset: torch.utils.data.Dataset,
+                          classes: List[str] = None,
+                          n: int = 10,
+                          display_shape: bool = True,
+                          seed: int = None):
+    
+    # 2 - adjust display if n is to high
+    if n > 10:
+        n = 10
+        display_shape = False
+        print(f"For display, purposes, n, shouldnt be larger than 10, setting to 10 and removing shape display.")
+    
+    # 3 - set the seed
+    if seed:
+        random.seed(seed)
+    
+    # 4 - get random sample indexes
+    random_samples_idx = random.sample(range(len(dataset)), k=n)
+
+    # 5 - setup plot
+    plt.figure(figsize=(16, 8))
+
+    # 6 - loop through the samples indexes and plot them with matplotlib
+    for i, targ_sample in enumerate(random_samples_idx):
+        targ_image, targ_label = dataset[targ_sample][0], dataset[targ_sample][1]
+
+        # 7 - adjust tensor dimensions for plotting
+        targ_image_adjust = targ_image.permute(1, 2, 0) # [color_channels, height, width] -> [height, width, color_channels]
+
+        # plot adjusted samples
+        plt.subplot(1, n, i+1)
+        plt.imshow(targ_image_adjust)
+        plt.axis("off")
+
+        if classes:
+            title = f"Class: {classes[targ_label]}"
+            if display_shape:
+                title += f"\nShape: {targ_image_adjust.shape}"
+        plt.title(title)
+    plt.show()
+
+# display random images from the ImageFolderCustom Dataset
+# display_random_images(dataset=train_data,
+#                       classes=class_names,
+#                       n=5,
+#                       display_shape=True,
+#                       seed=None)
+# doisplay random images from the ImageFolderCustom Dataset
+display_random_images(train_data_custom,
+                      n=20,
+                      classes=class_names,
+                      seed=None)
+
