@@ -159,7 +159,7 @@ y_pred_probs = torch.softmax(y_logits, dim=1)#print(y_pred_probs[:5])
 # Turn prediction probabilities into prediction labels
 y_preds = y_pred_probs.argmax(dim=1)
 
-from helper_function import plot_decision_boundary
+from helper_functions import plot_decision_boundary
 
 
 plt.figure(figsize=(12, 6))

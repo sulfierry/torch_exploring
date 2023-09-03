@@ -143,7 +143,7 @@ model_0 = FashionMINSTModelV0(
 # loss function for multi-class classification - 'nn.CrossEntropyLoss()'
 # optimizer - 'torch.optim.SGD()'
 # accuracy as our evaluation metric
-from helper_function import accuracy_fn
+from helper_functions import accuracy_fn
 
 # setup loss function and optimizer
 loss_fn = nn.CrossEntropyLoss()
@@ -329,7 +329,7 @@ model_1 = FashioMINSTModelV1(input_shape=train_features_batch.shape[2]*train_fea
                              output_shape=len(class_names)).to(device)
  
 # setup loss, optimizer and evaluation metrics
-from helper_function import accuracy_fn
+from helper_functions import accuracy_fn
 loss_fn = nn.CrossEntropyLoss() # measure how wrong the model is
 optmizer = torch.optim.SGD(params=model_1.parameters(), lr=0.1) # update models parameters to reduce the loss
 #acc_fn = accuracy_fn # calculate accuracy of model
@@ -591,7 +591,7 @@ print(rand_image_tensor.shape)
 model_2(rand_image_tensor.unsqueeze(dim=0).to(device))
 
 # setup a loss function and optimizer for 'model_2'
-from helper_function import accuracy_fn
+from helper_functions import accuracy_fn
 
 loss_fn = nn.CrossEntropyLoss() # because is a multi-class classification problem
 optimizer = torch.optim.SGD(params=model_2.parameters(), lr=0.1)
