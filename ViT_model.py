@@ -297,3 +297,37 @@ summary(model=pretrained_vit,
       )
 
 print(summary)
+
+
+# get automatic fransforms from pretrained ViT weights
+vit_transforms = pretrained_vit_weights.transforms()
+
+# setup dataloaders
+train_dataloader_pretrained, test_dataloader_pretrained, class_names = create_dataloaders(train_dir=train_dir,
+                                                                                                     test_dir=test_dir,
+                                                                                                     transform=vit_transforms,
+                                                                                                     batch_size=32
+                                                                                                     )
+# create optimizer and loss function
+optimizer = torch.optim.Adam(params=pretrained_vit.parameters(),
+                             lr=1e-3)
+loss_fn = torch.nn.CrossEntropyLoss()
+set_seeds()
+
+# Primeiro, você instancia a classe EngineClass
+engine = EngineClass(
+    model=pretrained_vit,
+    optimizer=optimizer,
+    loss_fn=loss_fn,
+    device=device
+)
+
+# Então, você chama o método train
+pretrained_vit_results = engine.train(
+    train_dataloader=train_dataloader_pretrained,
+    test_dataloader=test_dataloader_pretrained,
+    epochs=10
+)
+
+# Plot our pretrained ViT model's loss curves
+plot_loss_curves(pretrained_vit_results)
