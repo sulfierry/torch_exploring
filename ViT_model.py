@@ -16,8 +16,7 @@ device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is
 
 class EngineClass:
 
-    NUM_WORKERS = os.cpu_count() # os.cpu_count()
-
+    NUM_WORKERS = os.cpu_count()
 
     def __init__(self, model: torch.nn.Module, 
                  optimizer: torch.optim.Optimizer, 
@@ -151,12 +150,10 @@ class EngineClass:
         Args:
             seed (int, optional): Random seed to set. Defaults to 42.
         """
-        # Set the seed for general torch operations
         torch.manual_seed(seed)
-        # Set the seed for CUDA torch operations (ones that happen on the GPU)
+        torch.mps.manual_seed(seed)
         torch.cuda.manual_seed(seed)
 
-    # Plot loss curves of a model
     @staticmethod
     def plot_loss_curves(results):
         """Plots training curves of a results dictionary.
@@ -251,6 +248,8 @@ if __name__=="__main__":
     TRAIN_DIR = image_path / "train"
     TEST_DIR = image_path / "test"
     
+    PRE_TRAINED_MODEL_WEITGHTS = torchvision.models.ViT_B_16_Weights.DEFAULT
+    PRE_TRAINED_MODEL = torchvision.models.vit_b_16(weights=PRE_TRAINED_MODEL_WEITGHTS).to(device)
     EMBEDDING_SIZE = 768
     LEARNING_RATE = 0.03
     COLOR_CHANNELS = 3
@@ -268,44 +267,37 @@ if __name__=="__main__":
                                                                                     test_dir=TEST_DIR, 
                                                                                     transform=manual_transforms, 
                                                                                     batch_size=BATCH_SIZE)
-    # get pretrained weights for ViT-Base
-    pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
-
-    # setup ViT model instance with pretrained weights
-    pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
-
-    parameter = EngineClass.freeze_base_parameters(pretrained_vit)
+    parameter = EngineClass.freeze_base_parameters(PRE_TRAINED_MODEL)
 
     # Substituindo a última camada (heads) do modelo
     # A ideia é manter as camadas anteriores (que capturaram recursos genéricos das imagens) 
     # e substituir a última camada para adaptá-la a um novo conjunto de classes.
-    pretrained_vit.heads = nn.Linear(in_features=EMBEDDING_SIZE, out_features=len(class_names)).to(device)
+    PRE_TRAINED_MODEL.heads = nn.Linear(in_features=EMBEDDING_SIZE, out_features=len(class_names)).to(device)
 
     # get a summary using torchinfo.summary
-    summary(model=pretrained_vit,
-            input_size=(BATCH_SIZE, COLOR_CHANNELS, IMG_SIZE, IMG_SIZE), # (batch_size, color_channels, height, width, number_of_patches, )
+    summary(model=PRE_TRAINED_MODEL,
+            input_size=(BATCH_SIZE, COLOR_CHANNELS, IMG_SIZE, IMG_SIZE),
             col_names=["input_size", "output_size", "num_params", "trainable"],
             col_width=20,
             row_settings=["var_names"]
         )
 
     # get automatic fransforms from pretrained ViT weights
-    vit_transforms = pretrained_vit_weights.transforms()
+    vit_transforms = PRE_TRAINED_MODEL_WEITGHTS.transforms()
 
     # setup dataloaders
     train_dataloader_pretrained, test_dataloader_pretrained, class_names = EngineClass.create_dataloaders(train_dir=TRAIN_DIR,
                                                                                                         test_dir=TEST_DIR,
                                                                                                         transform=vit_transforms,
-                                                                                                        batch_size=BATCH_SIZE
-                                                                                                        )
+                                                                                                        batch_size=BATCH_SIZE)
     # create optimizer and loss function
-    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(params=PRE_TRAINED_MODEL.parameters(), lr=LEARNING_RATE)
     
     loss_fn = torch.nn.CrossEntropyLoss()
 
     # Primeiro, você instancia a classe EngineClass
     engine = EngineClass(
-        model=pretrained_vit,
+        model=PRE_TRAINED_MODEL,
         optimizer=optimizer,
         loss_fn=loss_fn,
         device=device
