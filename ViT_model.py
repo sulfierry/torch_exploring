@@ -1,14 +1,155 @@
 import torch
+from torchvision import transforms
+import torchvision
+from torch import nn
 
-device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+
 import torchvision
 from pathlib import Path
 import zipfile
 import requests
 import os
 
+import torch
+from typing import Tuple, Dict, List
+from tqdm import tqdm
+
+# getting a visual summary of our ViT model
+from torchinfo import summary
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
 
 import matplotlib.pyplot as plt
+
+device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+
+
+
+class EngineClass:
+    def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
+        self.model = model.to(device)
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.device = device
+
+    def train_step(self, dataloader: torch.utils.data.DataLoader) -> Tuple[float, float]:
+        self.model.train()
+        train_loss, train_acc = 0, 0
+        for batch, (X, y) in enumerate(dataloader):
+            X, y = X.to(self.device), y.to(self.device)
+            y_pred = self.model(X)
+            loss = self.loss_fn(y_pred, y)
+            train_loss += loss.item()
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+            train_acc += (y_pred_class == y).sum().item()/len(y_pred)
+        train_loss = train_loss / len(dataloader)
+        train_acc = train_acc / len(dataloader)
+        return train_loss, train_acc
+
+    def test_step(self, dataloader: torch.utils.data.DataLoader) -> Tuple[float, float]:
+        self.model.eval()
+        test_loss, test_acc = 0, 0
+        with torch.inference_mode():
+            for batch, (X, y) in enumerate(dataloader):
+                X, y = X.to(self.device), y.to(self.device)
+                test_pred_logits = self.model(X)
+                loss = self.loss_fn(test_pred_logits, y)
+                test_loss += loss.item()
+                test_pred_labels = test_pred_logits.argmax(dim=1)
+                test_acc += ((test_pred_labels == y).sum().item()/len(test_pred_labels))
+        test_loss = test_loss / len(dataloader)
+        test_acc = test_acc / len(dataloader)
+        return test_loss, test_acc
+
+    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader, epochs: int) -> Dict[str, List[float]]:
+        results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
+        for epoch in tqdm(range(epochs)):
+            train_loss, train_acc = self.train_step(dataloader=train_dataloader)
+            test_loss, test_acc = self.test_step(dataloader=test_dataloader)
+            print(f"Epoch: {epoch+1} | train_loss: {train_loss:.4f} | train_acc: {train_acc:.4f} | test_loss: {test_loss:.4f} | test_acc: {test_acc:.4f}")
+            results["train_loss"].append(train_loss)
+            results["train_acc"].append(train_acc)
+            results["test_loss"].append(test_loss)
+            results["test_acc"].append(test_acc)
+        return results
+
+
+
+NUM_WORKERS = 0 # os.cpu_count()
+
+def create_dataloaders(
+    train_dir: str,
+    test_dir: str,
+    transform: transforms.Compose,
+    batch_size: int,
+    num_workers: int=NUM_WORKERS
+):
+  """Creates training and testing DataLoaders.
+
+  Takes in a training directory and testing directory path and turns
+  them into PyTorch Datasets and then into PyTorch DataLoaders.
+
+  Args:
+    train_dir: Path to training directory.
+    test_dir: Path to testing directory.
+    transform: torchvision transforms to perform on training and testing data.
+    batch_size: Number of samples per batch in each of the DataLoaders.
+    num_workers: An integer for number of workers per DataLoader.
+
+  Returns:
+    A tuple of (train_dataloader, test_dataloader, class_names).
+    Where class_names is a list of the target classes.
+    Example usage:
+      train_dataloader, test_dataloader, class_names = \
+        = create_dataloaders(train_dir=path/to/train_dir,
+                             test_dir=path/to/test_dir,
+                             transform=some_transform,
+                             batch_size=32,
+                             num_workers=4)
+  """
+  # Use ImageFolder to create dataset(s)
+  train_data = datasets.ImageFolder(train_dir, transform=transform)
+  test_data = datasets.ImageFolder(test_dir, transform=transform)
+
+  # Get class names
+  class_names = train_data.classes
+
+  # Turn images into data loaders
+  train_dataloader = DataLoader(
+      train_data,
+      batch_size=batch_size,
+      shuffle=True,
+      num_workers=num_workers,
+      pin_memory=True,
+  )
+  test_dataloader = DataLoader(
+      test_data,
+      batch_size=batch_size,
+      shuffle=False,
+      num_workers=num_workers,
+      pin_memory=True,
+  )
+
+  return train_dataloader, test_dataloader, class_names
+
+    
+# putting it al together: from image to embedding
+# we turn an image in a flattened sequence of patch embeddings
+
+# Set seeds
+def set_seeds(seed: int=42):
+    """Sets random sets for torch operations.
+
+    Args:
+        seed (int, optional): Random seed to set. Defaults to 42.
+    """
+    # Set the seed for general torch operations
+    torch.manual_seed(seed)
+    # Set the seed for CUDA torch operations (ones that happen on the GPU)
+    torch.cuda.manual_seed(seed)
 
 # Plot loss curves of a model
 def plot_loss_curves(results):
@@ -94,174 +235,46 @@ def download_data(source: str,
 
     return image_path
 
+def transform_pipeline_manually(IMG_SIZE):
+
+    return transforms.Compose([
+    transforms.Resize((IMG_SIZE, IMG_SIZE)),
+    transforms.ToTensor(),
+])
+    
+def freeze_base_parameters(pretrained_vit):
+  # freeze base parameters
+  for parameter in pretrained_vit.parameters():
+    parameter.requires_grad = False
+
+  return parameter    
+
 
 image_path = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
                            destination="pizza_steak_sushi")
 
 # Setup directory paths to train and test images
-train_dir = image_path / "train"
-test_dir = image_path / "test"
-
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-
-
-
-NUM_WORKERS = 0 # os.cpu_count()
-
-def create_dataloaders(
-    train_dir: str,
-    test_dir: str,
-    transform: transforms.Compose,
-    batch_size: int,
-    num_workers: int=NUM_WORKERS
-):
-  """Creates training and testing DataLoaders.
-
-  Takes in a training directory and testing directory path and turns
-  them into PyTorch Datasets and then into PyTorch DataLoaders.
-
-  Args:
-    train_dir: Path to training directory.
-    test_dir: Path to testing directory.
-    transform: torchvision transforms to perform on training and testing data.
-    batch_size: Number of samples per batch in each of the DataLoaders.
-    num_workers: An integer for number of workers per DataLoader.
-
-  Returns:
-    A tuple of (train_dataloader, test_dataloader, class_names).
-    Where class_names is a list of the target classes.
-    Example usage:
-      train_dataloader, test_dataloader, class_names = \
-        = create_dataloaders(train_dir=path/to/train_dir,
-                             test_dir=path/to/test_dir,
-                             transform=some_transform,
-                             batch_size=32,
-                             num_workers=4)
-  """
-  # Use ImageFolder to create dataset(s)
-  train_data = datasets.ImageFolder(train_dir, transform=transform)
-  test_data = datasets.ImageFolder(test_dir, transform=transform)
-
-  # Get class names
-  class_names = train_data.classes
-
-  # Turn images into data loaders
-  train_dataloader = DataLoader(
-      train_data,
-      batch_size=batch_size,
-      shuffle=True,
-      num_workers=num_workers,
-      pin_memory=True,
-  )
-  test_dataloader = DataLoader(
-      test_data,
-      batch_size=batch_size,
-      shuffle=False,
-      num_workers=num_workers,
-      pin_memory=True,
-  )
-
-  return train_dataloader, test_dataloader, class_names
-
-from torchvision import transforms
+TRAIN_DIR = image_path / "train"
+TEST_DIR = image_path / "test"
 
 # Create image size (from Table 3 in the ViT paper)
 IMG_SIZE = 224
 
-# Create transform pipeline manually
-manual_transforms = transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.ToTensor(),
-])
-print(f"Manually created transforms: {manual_transforms}")
-
-  # Set the batch size
+# Set the batch size
 BATCH_SIZE = 32 # this is lower than the ViT paper but it's because we're starting small
+
+# Create transform pipeline manually
+manual_transforms = transform_pipeline_manually(IMG_SIZE)
+print(manual_transforms)
+
 
 # Create data loaders
 train_dataloader, test_dataloader, class_names = create_dataloaders(
-    train_dir=train_dir,
-    test_dir=test_dir,
+    train_dir=TRAIN_DIR,
+    test_dir=TEST_DIR,
     transform=manual_transforms, # use manually created transforms
     batch_size=BATCH_SIZE
 )
-
-
-import torch
-from typing import Tuple, Dict, List
-from tqdm import tqdm
-
-class EngineClass:
-    def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
-        self.model = model.to(device)
-        self.optimizer = optimizer
-        self.loss_fn = loss_fn
-        self.device = device
-
-    def train_step(self, dataloader: torch.utils.data.DataLoader) -> Tuple[float, float]:
-        self.model.train()
-        train_loss, train_acc = 0, 0
-        for batch, (X, y) in enumerate(dataloader):
-            X, y = X.to(self.device), y.to(self.device)
-            y_pred = self.model(X)
-            loss = self.loss_fn(y_pred, y)
-            train_loss += loss.item()
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-            y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-            train_acc += (y_pred_class == y).sum().item()/len(y_pred)
-        train_loss = train_loss / len(dataloader)
-        train_acc = train_acc / len(dataloader)
-        return train_loss, train_acc
-
-    def test_step(self, dataloader: torch.utils.data.DataLoader) -> Tuple[float, float]:
-        self.model.eval()
-        test_loss, test_acc = 0, 0
-        with torch.inference_mode():
-            for batch, (X, y) in enumerate(dataloader):
-                X, y = X.to(self.device), y.to(self.device)
-                test_pred_logits = self.model(X)
-                loss = self.loss_fn(test_pred_logits, y)
-                test_loss += loss.item()
-                test_pred_labels = test_pred_logits.argmax(dim=1)
-                test_acc += ((test_pred_labels == y).sum().item()/len(test_pred_labels))
-        test_loss = test_loss / len(dataloader)
-        test_acc = test_acc / len(dataloader)
-        return test_loss, test_acc
-
-    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader, epochs: int) -> Dict[str, List[float]]:
-        results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
-        for epoch in tqdm(range(epochs)):
-            train_loss, train_acc = self.train_step(dataloader=train_dataloader)
-            test_loss, test_acc = self.test_step(dataloader=test_dataloader)
-            print(f"Epoch: {epoch+1} | train_loss: {train_loss:.4f} | train_acc: {train_acc:.4f} | test_loss: {test_loss:.4f} | test_acc: {test_acc:.4f}")
-            results["train_loss"].append(train_loss)
-            results["train_acc"].append(train_acc)
-            results["test_loss"].append(test_loss)
-            results["test_acc"].append(test_acc)
-        return results
-    
-# putting it al together: from image to embedding
-# we turn an image in a flattened sequence of patch embeddings
-
-# Set seeds
-def set_seeds(seed: int=42):
-    """Sets random sets for torch operations.
-
-    Args:
-        seed (int, optional): Random seed to set. Defaults to 42.
-    """
-    # Set the seed for general torch operations
-    torch.manual_seed(seed)
-    # Set the seed for CUDA torch operations (ones that happen on the GPU)
-    torch.cuda.manual_seed(seed)
-
-
-
-import torchvision
-from torch import nn
 
 # get pretrained weights for ViT-Base
 pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
@@ -269,17 +282,11 @@ pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
 # setup ViT model instance with pretrained weights
 pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
 
-# freeze base parameters
-for parameter in pretrained_vit.parameters():
-  parameter.requires_grad = False
+parameter = freeze_base_parameters(pretrained_vit)
 
 # update the classifier head
 set_seeds()
 pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
-
-
-# getting a visual summary of our ViT model
-from torchinfo import summary
 
 # get a summary using torchinfo.summary
 summary(model=pretrained_vit,
@@ -288,38 +295,5 @@ summary(model=pretrained_vit,
         col_width=20,
         row_settings=["var_names"]
       )
+
 print(summary)
-
-
-# get automatic fransforms from pretrained ViT weights
-vit_transforms = pretrained_vit_weights.transforms()
-
-# setup dataloaders
-train_dataloader_pretrained, test_dataloader_pretrained, class_names = create_dataloaders(train_dir=train_dir,
-                                                                                                     test_dir=test_dir,
-                                                                                                     transform=vit_transforms,
-                                                                                                     batch_size=32
-                                                                                                     )
-# create optimizer and loss function
-optimizer = torch.optim.Adam(params=pretrained_vit.parameters(),
-                             lr=1e-3)
-loss_fn = torch.nn.CrossEntropyLoss()
-set_seeds()
-
-# Primeiro, você instancia a classe EngineClass
-engine = EngineClass(
-    model=pretrained_vit,
-    optimizer=optimizer,
-    loss_fn=loss_fn,
-    device=device
-)
-
-# Então, você chama o método train
-pretrained_vit_results = engine.train(
-    train_dataloader=train_dataloader_pretrained,
-    test_dataloader=test_dataloader_pretrained,
-    epochs=10
-)
-
-# Plot our pretrained ViT model's loss curves
-plot_loss_curves(pretrained_vit_results)
