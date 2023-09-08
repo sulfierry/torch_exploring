@@ -26,6 +26,10 @@ device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is
 
 
 class EngineClass:
+
+    NUM_WORKERS = 0 # os.cpu_count()
+
+
     def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
         self.model = model.to(device)
         self.optimizer = optimizer
@@ -75,119 +79,125 @@ class EngineClass:
             results["test_loss"].append(test_loss)
             results["test_acc"].append(test_acc)
         return results
-
-
-
-NUM_WORKERS = 0 # os.cpu_count()
-
-def create_dataloaders(
-    train_dir: str,
-    test_dir: str,
-    transform: transforms.Compose,
-    batch_size: int,
-    num_workers: int=NUM_WORKERS
-):
-  """Creates training and testing DataLoaders.
-
-  Takes in a training directory and testing directory path and turns
-  them into PyTorch Datasets and then into PyTorch DataLoaders.
-
-  Args:
-    train_dir: Path to training directory.
-    test_dir: Path to testing directory.
-    transform: torchvision transforms to perform on training and testing data.
-    batch_size: Number of samples per batch in each of the DataLoaders.
-    num_workers: An integer for number of workers per DataLoader.
-
-  Returns:
-    A tuple of (train_dataloader, test_dataloader, class_names).
-    Where class_names is a list of the target classes.
-    Example usage:
-      train_dataloader, test_dataloader, class_names = \
-        = create_dataloaders(train_dir=path/to/train_dir,
-                             test_dir=path/to/test_dir,
-                             transform=some_transform,
-                             batch_size=32,
-                             num_workers=4)
-  """
-  # Use ImageFolder to create dataset(s)
-  train_data = datasets.ImageFolder(train_dir, transform=transform)
-  test_data = datasets.ImageFolder(test_dir, transform=transform)
-
-  # Get class names
-  class_names = train_data.classes
-
-  # Turn images into data loaders
-  train_dataloader = DataLoader(
-      train_data,
-      batch_size=batch_size,
-      shuffle=True,
-      num_workers=num_workers,
-      pin_memory=True,
-  )
-  test_dataloader = DataLoader(
-      test_data,
-      batch_size=batch_size,
-      shuffle=False,
-      num_workers=num_workers,
-      pin_memory=True,
-  )
-
-  return train_dataloader, test_dataloader, class_names
-
     
-# putting it al together: from image to embedding
-# we turn an image in a flattened sequence of patch embeddings
+    @staticmethod
+    def create_dataloaders(train_dir: str, test_dir: str, transform: transforms.Compose, batch_size: int, num_workers: int=NUM_WORKERS):
+        # Your create_dataloaders function code here
 
-# Set seeds
-def set_seeds(seed: int=42):
-    """Sets random sets for torch operations.
+        """Creates training and testing DataLoaders.
 
-    Args:
-        seed (int, optional): Random seed to set. Defaults to 42.
-    """
-    # Set the seed for general torch operations
-    torch.manual_seed(seed)
-    # Set the seed for CUDA torch operations (ones that happen on the GPU)
-    torch.cuda.manual_seed(seed)
+        Takes in a training directory and testing directory path and turns
+        them into PyTorch Datasets and then into PyTorch DataLoaders.
 
-# Plot loss curves of a model
-def plot_loss_curves(results):
-    """Plots training curves of a results dictionary.
+        Args:
+            train_dir: Path to training directory.
+            test_dir: Path to testing directory.
+            transform: torchvision transforms to perform on training and testing data.
+            batch_size: Number of samples per batch in each of the DataLoaders.
+            num_workers: An integer for number of workers per DataLoader.
 
-    Args:
-        results (dict): dictionary containing list of values, e.g.
-            {"train_loss": [...],
-             "train_acc": [...],
-             "test_loss": [...],
-             "test_acc": [...]}
-    """
-    loss = results["train_loss"]
-    test_loss = results["test_loss"]
+        Returns:
+            A tuple of (train_dataloader, test_dataloader, class_names).
+            Where class_names is a list of the target classes.
+            Example usage:
+            train_dataloader, test_dataloader, class_names = \
+                = create_dataloaders(train_dir=path/to/train_dir,
+                                    test_dir=path/to/test_dir,
+                                    transform=some_transform,
+                                    batch_size=32,
+                                    num_workers=4)
+        """
+        # Use ImageFolder to create dataset(s)
+        train_data = datasets.ImageFolder(train_dir, transform=transform)
+        test_data = datasets.ImageFolder(test_dir, transform=transform)
 
-    accuracy = results["train_acc"]
-    test_accuracy = results["test_acc"]
+        # Get class names
+        class_names = train_data.classes
 
-    epochs = range(len(results["train_loss"]))
+        # Turn images into data loaders
+        train_dataloader = DataLoader(
+            train_data,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=True,
+        )
+        test_dataloader = DataLoader(
+            test_data,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=num_workers,
+            pin_memory=True,
+        )
 
-    plt.figure(figsize=(15, 7))
+        return train_dataloader, test_dataloader, class_names
 
-    # Plot loss
-    plt.subplot(1, 2, 1)
-    plt.plot(epochs, loss, label="train_loss")
-    plt.plot(epochs, test_loss, label="test_loss")
-    plt.title("Loss")
-    plt.xlabel("Epochs")
-    plt.legend()
+    @staticmethod
+    def transform_pipeline_manually(IMG_SIZE):
 
-    # Plot accuracy
-    plt.subplot(1, 2, 2)
-    plt.plot(epochs, accuracy, label="train_accuracy")
-    plt.plot(epochs, test_accuracy, label="test_accuracy")
-    plt.title("Accuracy")
-    plt.xlabel("Epochs")
-    plt.legend()
-    plt.show()
+        return transforms.Compose([
+        transforms.Resize((IMG_SIZE, IMG_SIZE)),
+        transforms.ToTensor(),
+    ])
+
+    @staticmethod   
+    def freeze_base_parameters(pretrained_vit):
+        # freeze base parameters
+        for parameter in pretrained_vit.parameters():
+            parameter.requires_grad = False
+
+        return parameter    
+    
+    @staticmethod
+    def set_seeds(seed: int=42):
+        """Sets random sets for torch operations.
+
+        Args:
+            seed (int, optional): Random seed to set. Defaults to 42.
+        """
+        # Set the seed for general torch operations
+        torch.manual_seed(seed)
+        # Set the seed for CUDA torch operations (ones that happen on the GPU)
+        torch.cuda.manual_seed(seed)
+
+    # Plot loss curves of a model
+    @staticmethod
+    def plot_loss_curves(results):
+        """Plots training curves of a results dictionary.
+
+        Args:
+            results (dict): dictionary containing list of values, e.g.
+                {"train_loss": [...],
+                "train_acc": [...],
+                "test_loss": [...],
+                "test_acc": [...]}
+        """
+        loss = results["train_loss"]
+        test_loss = results["test_loss"]
+
+        accuracy = results["train_acc"]
+        test_accuracy = results["test_acc"]
+
+        epochs = range(len(results["train_loss"]))
+
+        plt.figure(figsize=(15, 7))
+
+        # Plot loss
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs, loss, label="train_loss")
+        plt.plot(epochs, test_loss, label="test_loss")
+        plt.title("Loss")
+        plt.xlabel("Epochs")
+        plt.legend()
+
+        # Plot accuracy
+        plt.subplot(1, 2, 2)
+        plt.plot(epochs, accuracy, label="train_accuracy")
+        plt.plot(epochs, test_accuracy, label="test_accuracy")
+        plt.title("Accuracy")
+        plt.xlabel("Epochs")
+        plt.legend()
+        plt.show()
 
 def download_data(source: str,
                   destination: str,
@@ -235,99 +245,85 @@ def download_data(source: str,
 
     return image_path
 
-def transform_pipeline_manually(IMG_SIZE):
 
-    return transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.ToTensor(),
-])
+if __name__=="__main__":
+        
+    image_path = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
+                            destination="pizza_steak_sushi")
+
+    # Setup directory paths to train and test images
+    TRAIN_DIR = image_path / "train"
+    TEST_DIR = image_path / "test"
+
+    # Create image size (from Table 3 in the ViT paper)
+    IMG_SIZE = 224
+
+    # Set the batch size
+    BATCH_SIZE = 32 # this is lower than the ViT paper but it's because we're starting small
     
-def freeze_base_parameters(pretrained_vit):
-  # freeze base parameters
-  for parameter in pretrained_vit.parameters():
-    parameter.requires_grad = False
+    EngineClass.set_seeds()
+    
+    # Create transform pipeline manually
+    manual_transforms = EngineClass.transform_pipeline_manually(IMG_SIZE)
 
-  return parameter    
+    # Create data loaders
+    train_dataloader, test_dataloader, class_names = EngineClass.create_dataloaders(
+        train_dir=TRAIN_DIR,
+        test_dir=TEST_DIR,
+        transform=manual_transforms, # use manually created transforms
+        batch_size=BATCH_SIZE
+    )
 
+    # get pretrained weights for ViT-Base
+    pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
 
-image_path = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
-                           destination="pizza_steak_sushi")
+    # setup ViT model instance with pretrained weights
+    pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
 
-# Setup directory paths to train and test images
-TRAIN_DIR = image_path / "train"
-TEST_DIR = image_path / "test"
+    parameter = EngineClass.freeze_base_parameters(pretrained_vit)
 
-# Create image size (from Table 3 in the ViT paper)
-IMG_SIZE = 224
-
-# Set the batch size
-BATCH_SIZE = 32 # this is lower than the ViT paper but it's because we're starting small
-
-# Create transform pipeline manually
-manual_transforms = transform_pipeline_manually(IMG_SIZE)
-print(manual_transforms)
+    # update the classifier head
 
 
-# Create data loaders
-train_dataloader, test_dataloader, class_names = create_dataloaders(
-    train_dir=TRAIN_DIR,
-    test_dir=TEST_DIR,
-    transform=manual_transforms, # use manually created transforms
-    batch_size=BATCH_SIZE
-)
+    pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
 
-# get pretrained weights for ViT-Base
-pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
+    # get a summary using torchinfo.summary
+    summary(model=pretrained_vit,
+            input_size=(1, 3, 224, 224), # (batch_size, color_channels, height, width, number_of_patches, )
+            col_names=["input_size", "output_size", "num_params", "trainable"],
+            col_width=20,
+            row_settings=["var_names"]
+        )
 
-# setup ViT model instance with pretrained weights
-pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
+    # get automatic fransforms from pretrained ViT weights
+    vit_transforms = pretrained_vit_weights.transforms()
 
-parameter = freeze_base_parameters(pretrained_vit)
+    # setup dataloaders
+    train_dataloader_pretrained, test_dataloader_pretrained, class_names = EngineClass.create_dataloaders(train_dir=TRAIN_DIR,
+                                                                                                        test_dir=TEST_DIR,
+                                                                                                        transform=vit_transforms,
+                                                                                                        batch_size=32
+                                                                                                        )
+    # create optimizer and loss function
+    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(),
+                                lr=1e-3)
+    
+    loss_fn = torch.nn.CrossEntropyLoss()
 
-# update the classifier head
-set_seeds()
-pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
+    # Primeiro, você instancia a classe EngineClass
+    engine = EngineClass(
+        model=pretrained_vit,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
+        device=device
+    )
 
-# get a summary using torchinfo.summary
-summary(model=pretrained_vit,
-        input_size=(1, 3, 224, 224), # (batch_size, color_channels, height, width, number_of_patches, )
-        col_names=["input_size", "output_size", "num_params", "trainable"],
-        col_width=20,
-        row_settings=["var_names"]
-      )
+    # Então, você chama o método train
+    pretrained_vit_results = engine.train(
+        train_dataloader=train_dataloader_pretrained,
+        test_dataloader=test_dataloader_pretrained,
+        epochs=10
+    )
 
-print(summary)
-
-
-# get automatic fransforms from pretrained ViT weights
-vit_transforms = pretrained_vit_weights.transforms()
-
-# setup dataloaders
-train_dataloader_pretrained, test_dataloader_pretrained, class_names = create_dataloaders(train_dir=train_dir,
-                                                                                                     test_dir=test_dir,
-                                                                                                     transform=vit_transforms,
-                                                                                                     batch_size=32
-                                                                                                     )
-# create optimizer and loss function
-optimizer = torch.optim.Adam(params=pretrained_vit.parameters(),
-                             lr=1e-3)
-loss_fn = torch.nn.CrossEntropyLoss()
-set_seeds()
-
-# Primeiro, você instancia a classe EngineClass
-engine = EngineClass(
-    model=pretrained_vit,
-    optimizer=optimizer,
-    loss_fn=loss_fn,
-    device=device
-)
-
-# Então, você chama o método train
-pretrained_vit_results = engine.train(
-    train_dataloader=train_dataloader_pretrained,
-    test_dataloader=test_dataloader_pretrained,
-    epochs=10
-)
-
-# Plot our pretrained ViT model's loss curves
-plot_loss_curves(pretrained_vit_results)
+    print(summary)
+    EngineClass.plot_loss_curves(pretrained_vit_results)
