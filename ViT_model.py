@@ -19,7 +19,11 @@ class EngineClass:
     NUM_WORKERS = os.cpu_count() # os.cpu_count()
 
 
-    def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
+    def __init__(self, model: torch.nn.Module, 
+                 optimizer: torch.optim.Optimizer, 
+                 loss_fn: torch.nn.Module, 
+                 device: torch.device):
+        
         self.model = model.to(device)
         self.optimizer = optimizer
         self.loss_fn = loss_fn
@@ -70,8 +74,11 @@ class EngineClass:
         return results
     
     @staticmethod
-    def create_dataloaders(train_dir: str, test_dir: str, transform: transforms.Compose, batch_size: int, num_workers: int=NUM_WORKERS):
-        # Your create_dataloaders function code here
+    def create_dataloaders(train_dir: str, 
+                           test_dir: str, 
+                           transform: transforms.Compose, 
+                           batch_size: int, 
+                           num_workers: int=NUM_WORKERS):
 
         """Creates training and testing DataLoaders.
 
@@ -243,12 +250,13 @@ if __name__=="__main__":
     # Setup directory paths to train and test images
     TRAIN_DIR = image_path / "train"
     TEST_DIR = image_path / "test"
-
-    # Create image size (from Table 3 in the ViT paper)
+    
+    EMBEDDING_SIZE = 768
+    LEARNING_RATE = 0.03
+    COLOR_CHANNELS = 3
     IMG_SIZE = 224
-
-    # Set the batch size
-    BATCH_SIZE = 32 # this is lower than the ViT paper but it's because we're starting small
+    BATCH_SIZE = 32 
+    EPOCHS = 10
     
     EngineClass.set_seeds()
     
@@ -256,13 +264,10 @@ if __name__=="__main__":
     manual_transforms = EngineClass.transform_pipeline_manually(IMG_SIZE)
 
     # Create data loaders
-    train_dataloader, test_dataloader, class_names = EngineClass.create_dataloaders(
-        train_dir=TRAIN_DIR,
-        test_dir=TEST_DIR,
-        transform=manual_transforms, # use manually created transforms
-        batch_size=BATCH_SIZE
-    )
-
+    train_dataloader, test_dataloader, class_names = EngineClass.create_dataloaders(train_dir=TRAIN_DIR, 
+                                                                                    test_dir=TEST_DIR, 
+                                                                                    transform=manual_transforms, 
+                                                                                    batch_size=BATCH_SIZE)
     # get pretrained weights for ViT-Base
     pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
 
@@ -271,11 +276,14 @@ if __name__=="__main__":
 
     parameter = EngineClass.freeze_base_parameters(pretrained_vit)
 
-    pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
+    # Substituindo a última camada (heads) do modelo
+    # A ideia é manter as camadas anteriores (que capturaram recursos genéricos das imagens) 
+    # e substituir a última camada para adaptá-la a um novo conjunto de classes.
+    pretrained_vit.heads = nn.Linear(in_features=EMBEDDING_SIZE, out_features=len(class_names)).to(device)
 
     # get a summary using torchinfo.summary
     summary(model=pretrained_vit,
-            input_size=(1, 3, 224, 224), # (batch_size, color_channels, height, width, number_of_patches, )
+            input_size=(BATCH_SIZE, COLOR_CHANNELS, IMG_SIZE, IMG_SIZE), # (batch_size, color_channels, height, width, number_of_patches, )
             col_names=["input_size", "output_size", "num_params", "trainable"],
             col_width=20,
             row_settings=["var_names"]
@@ -288,11 +296,10 @@ if __name__=="__main__":
     train_dataloader_pretrained, test_dataloader_pretrained, class_names = EngineClass.create_dataloaders(train_dir=TRAIN_DIR,
                                                                                                         test_dir=TEST_DIR,
                                                                                                         transform=vit_transforms,
-                                                                                                        batch_size=32
+                                                                                                        batch_size=BATCH_SIZE
                                                                                                         )
     # create optimizer and loss function
-    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(),
-                                lr=1e-3)
+    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=LEARNING_RATE)
     
     loss_fn = torch.nn.CrossEntropyLoss()
 
@@ -308,7 +315,7 @@ if __name__=="__main__":
     pretrained_vit_results = engine.train(
         train_dataloader=train_dataloader_pretrained,
         test_dataloader=test_dataloader_pretrained,
-        epochs=10
+        epochs=EPOCHS
     )
 
     print(summary)
