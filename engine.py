@@ -194,3 +194,62 @@ def train(model: torch.nn.Module,
 
     # Return the filled results at the end of the epochs
     return results
+
+"""
+    import torch
+from typing import Tuple, Dict, List
+from tqdm import tqdm
+
+class EngineClass:
+    def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
+        self.model = model
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.device = device
+    
+    def train_step(self, dataloader: torch.utils.data.DataLoader) -> Tuple[float, float]:
+        self.model.train()
+        train_loss, train_acc = 0, 0
+        for batch, (X, y) in enumerate(dataloader):
+            X, y = X.to(self.device), y.to(self.device)
+            y_pred = self.model(X)
+            loss = self.loss_fn(y_pred, y)
+            train_loss += loss.item()
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+            train_acc += (y_pred_class == y).sum().item()/len(y_pred)
+        train_loss = train_loss / len(dataloader)
+        train_acc = train_acc / len(dataloader)
+        return train_loss, train_acc
+
+    def test_step(self, dataloader: torch.utils.data.DataLoader) -> Tuple[float, float]:
+        self.model.eval()
+        test_loss, test_acc = 0, 0
+        with torch.inference_mode():
+            for batch, (X, y) in enumerate(dataloader):
+                X, y = X.to(self.device), y.to(self.device)
+                test_pred_logits = self.model(X)
+                loss = self.loss_fn(test_pred_logits, y)
+                test_loss += loss.item()
+                test_pred_labels = test_pred_logits.argmax(dim=1)
+                test_acc += ((test_pred_labels == y).sum().item()/len(test_pred_labels))
+        test_loss = test_loss / len(dataloader)
+        test_acc = test_acc / len(dataloader)
+        return test_loss, test_acc
+
+    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader, epochs: int) -> Dict[str, List[float]]:
+        results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
+        for epoch in tqdm(range(epochs)):
+            train_loss, train_acc = self.train_step(dataloader=train_dataloader)
+            test_loss, test_acc = self.test_step(dataloader=test_dataloader)
+            print(f"Epoch: {epoch+1} | train_loss: {train_loss:.4f} | train_acc: {train_acc:.4f} | test_loss: {test_loss:.4f} | test_acc: {test_acc:.4f}")
+            results["train_loss"].append(train_loss)
+            results["train_acc"].append(train_acc)
+            results["test_loss"].append(test_loss)
+            results["test_acc"].append(test_acc)
+        return results
+
+
+"""
