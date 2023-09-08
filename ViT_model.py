@@ -1,33 +1,22 @@
+import os
 import torch
-from torchvision import transforms
-import torchvision
-from torch import nn
-
-
-import torchvision
-from pathlib import Path
 import zipfile
 import requests
-import os
-
-import torch
-from typing import Tuple, Dict, List
+import torchvision
+from torch import nn
 from tqdm import tqdm
-
-# getting a visual summary of our ViT model
+from pathlib import Path
 from torchinfo import summary
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-
 import matplotlib.pyplot as plt
+from typing import Tuple, Dict, List
+from torch.utils.data import DataLoader
+from torchvision import transforms, datasets
 
 device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 
-
-
 class EngineClass:
 
-    NUM_WORKERS = 0 # os.cpu_count()
+    NUM_WORKERS = os.cpu_count() # os.cpu_count()
 
 
     def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
@@ -281,9 +270,6 @@ if __name__=="__main__":
     pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
 
     parameter = EngineClass.freeze_base_parameters(pretrained_vit)
-
-    # update the classifier head
-
 
     pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
 
