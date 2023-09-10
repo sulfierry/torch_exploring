@@ -9,6 +9,7 @@ from tqdm.auto import tqdm
 
 device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 
+
 def train_step(model: torch.nn.Module,
                dataloader: torch.utils.data.DataLoader,
                loss_fn: torch.nn.Module,
@@ -196,7 +197,7 @@ def train(model: torch.nn.Module,
     return results
 
 """
-    import torch
+import torch
 from typing import Tuple, Dict, List
 from tqdm import tqdm
 
@@ -252,4 +253,20 @@ class EngineClass:
         return results
 
 
+"""
+"""
+    # Primeiro, você instancia a classe EngineClass
+    engine = EngineClass(
+        model=pretrained_vit,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
+        device=device
+    )
+
+    # Então, você chama o método train
+    pretrained_vit_results = engine.train(
+        train_dataloader=train_dataloader_pretrained,
+        test_dataloader=test_dataloader_pretrained,
+        epochs=10
+    )
 """

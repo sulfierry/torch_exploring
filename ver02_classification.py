@@ -213,7 +213,7 @@ else:
     with open("./helper_function.py", "w") as f:
         f.write(request.text)"""
 
-from helper_function import plot_predictions, plot_decision_boundary
+from helper_functions import plot_predictions, plot_decision_boundary
 # plot decision boundary of the model
 #plt.figure(figsize=(12, 6))
 #plt.subplot(1, 2, 1)

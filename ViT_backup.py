@@ -78,7 +78,7 @@ class EngineClass:
 
 
 
-NUM_WORKERS = 0 # os.cpu_count()
+NUM_WORKERS = os.cpu_count()
 
 def create_dataloaders(
     train_dir: str,
@@ -296,6 +296,9 @@ def setup_model(train_dataloader, class_names, TRAIN_DIR, TEST_DIR):
 
 
 def train_model(model, optimizer, loss_fn, train_dataloader, test_dataloader):
+
+    EPOCHS = 10
+
     engine = EngineClass(
         model=model,
         optimizer=optimizer,
@@ -305,13 +308,13 @@ def train_model(model, optimizer, loss_fn, train_dataloader, test_dataloader):
     results = engine.train(
         train_dataloader=train_dataloader,
         test_dataloader=test_dataloader,
-        epochs=10
+        epochs=EPOCHS
     )
     return results
 
 if __name__=="__main__":
-    train_dataloader, test_dataloader, class_names, TRAIN_DIR, TEST_DIR = prepare_data()
-    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(train_dataloader, class_names, TEST_DIR, TEST_DIR)
+    train_dataloader, test_dataloader, class_names, train_dir, test_dir = prepare_data()
+    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(train_dataloader, class_names, train_dir, test_dir)
     results = train_model(model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained)
     
     plot_loss_curves(results)
