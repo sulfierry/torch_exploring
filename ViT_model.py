@@ -1,31 +1,24 @@
+import os
 import torch
-from torchvision import transforms
-import torchvision
-from torch import nn
-
-
-import torchvision
-from pathlib import Path
 import zipfile
 import requests
-import os
-
-import torch
-from typing import Tuple, Dict, List
+import torchinfo
+import torchvision
+from torch import nn
+from PIL import Image
 from tqdm import tqdm
-
-# getting a visual summary of our ViT model
+from pathlib import Path
 from torchinfo import summary
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-
 import matplotlib.pyplot as plt
+from typing import Tuple, Dict, List
+from torch.utils.data import DataLoader
+from torchvision import transforms, datasets
 
 device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 
 
-
 class EngineViT:
+
     def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
         self.model = model.to(device)
         self.optimizer = optimizer
@@ -173,48 +166,6 @@ class EngineViT:
         # Set the seed for CUDA torch operations (ones that happen on the GPU)
         torch.cuda.manual_seed(seed)
 
-
-
-    # Plot loss curves of a model
-    @staticmethod
-    def plot_loss_curves(results):
-        """Plots training curves of a results dictionary.
-
-        Args:
-            results (dict): dictionary containing list of values, e.g.
-                {"train_loss": [...],
-                "train_acc": [...],
-                "test_loss": [...],
-                "test_acc": [...]}
-        """
-        loss = results["train_loss"]
-        test_loss = results["test_loss"]
-
-        accuracy = results["train_acc"]
-        test_accuracy = results["test_acc"]
-
-        epochs = range(len(results["train_loss"]))
-
-        plt.figure(figsize=(15, 7))
-
-        # Plot loss
-        plt.subplot(1, 2, 1)
-        plt.plot(epochs, loss, label="train_loss")
-        plt.plot(epochs, test_loss, label="test_loss")
-        plt.title("Loss")
-        plt.xlabel("Epochs")
-        plt.legend()
-
-        # Plot accuracy
-        plt.subplot(1, 2, 2)
-        plt.plot(epochs, accuracy, label="train_accuracy")
-        plt.plot(epochs, test_accuracy, label="test_accuracy")
-        plt.title("Accuracy")
-        plt.xlabel("Epochs")
-        plt.legend()
-        plt.show()
-
-
     @staticmethod
     def prepare_data():
         image_path = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
@@ -265,7 +216,95 @@ class EngineViT:
 
             return pretrained_vit, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
     
-    
+
+
+    # Plot loss curves of a model
+    @staticmethod
+    def plot_loss_curves(results):
+        """Plots training curves of a results dictionary.
+
+        Args:
+            results (dict): dictionary containing list of values, e.g.
+                {"train_loss": [...],
+                "train_acc": [...],
+                "test_loss": [...],
+                "test_acc": [...]}
+        """
+        loss = results["train_loss"]
+        test_loss = results["test_loss"]
+
+        accuracy = results["train_acc"]
+        test_accuracy = results["test_acc"]
+
+        epochs = range(len(results["train_loss"]))
+
+        plt.figure(figsize=(15, 7))
+
+        # Plot loss
+        plt.subplot(1, 2, 1)
+        plt.plot(epochs, loss, label="train_loss")
+        plt.plot(epochs, test_loss, label="test_loss")
+        plt.title("Loss")
+        plt.xlabel("Epochs")
+        plt.legend()
+
+        # Plot accuracy
+        plt.subplot(1, 2, 2)
+        plt.plot(epochs, accuracy, label="train_accuracy")
+        plt.plot(epochs, test_accuracy, label="test_accuracy")
+        plt.title("Accuracy")
+        plt.xlabel("Epochs")
+        plt.legend()
+        plt.show()
+
+    # 1 - take in a trained model
+    @staticmethod
+    def pred_and_plot_image(model: torch.nn.Module,
+                            image_path: str,
+                            class_names: List[str],
+                            image_size: Tuple[int, int] = (224, 224),
+                            transform: torchvision.transforms = None,
+                            device: torch.device=device):
+        # 2 - open the image with PIL
+        img = Image.open(image_path)
+
+        # 3 - create a transform if one desnt exist
+        if transform is not None:
+            image_transform = transform
+        else:
+            image_transform = transforms.Compose([
+                transforms.Resize(image_size),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.546, 0.406],
+                                    std=[0.229, 0.224, 0.225])
+            ])
+        ### predict on image ###
+        # 4 - make sure the model is on the target device
+        model.to(device)
+
+        # 5 - turn the model to eval mode
+        model.eval()
+        with torch.inference_mode():
+            # 6 - transform the iamge and add an extra batch dimension
+            transformed_image = image_transform(img).unsqueeze(dim=0) # [batch_size, color_channels, height, width]
+
+            # 7 - make a prediction on the image by passing it to the model
+            target_image_pred = model(transformed_image.to(device))
+
+        # 8 - convert the model output logits to prediction probabilities using 'torch.softmax()'
+        target_image_pred_probs = torch.softmax(target_image_pred, dim=1)
+
+        # 9 - convert the models prediction probabilities to prediction labels using 'torch.argmax()'
+        target_image_pred_label = torch.argmax(target_image_pred_probs, dim=1)
+
+        # 10 - plot the image with matplotlib and set the title to the prediction label from step 9 and prediction probability from step 8
+        plt.figure()
+        plt.imshow(img)
+        plt.title(f"Prediction: {class_names[target_image_pred_label]} | Probabilite: {target_image_pred_probs.max()}")
+        plt.axis(False)
+        plt.show()
+
+
 
 def download_data(source: str,
                   destination: str,
@@ -326,3 +365,10 @@ if __name__=="__main__":
     results = engine.train_model(train_dataloader_pretrained, test_dataloader_pretrained)
     
     EngineViT.plot_loss_curves(results)
+
+    # get the model size in bytes then convert to megabytes
+    #pretrained_vit_model_size = Path("models/08_pretrained_vit_feature_extractor_pizza_steak_sushi.pth").stat().st_size // (1024*1024)
+    #print(f"Pretrained ViT feature extractor model size: {pretrained_vit_model_size} MB")
+
+    # making prediction on a custom image
+    pred_and_plot_image(model=pretrained_vit, image_path='/content/o5.jpeg', class_names=class_names)
