@@ -25,14 +25,9 @@ device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is
 
 
 
-class EngineClass:
-    NUM_WORKERS = 0 # os.cpu_count()
-
+class EngineViT:
     def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
-        if model is not None:
-            self.model = model.to(device)
-        else:
-            self.model = None
+        self.model = model.to(device)
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.device = device
@@ -81,13 +76,41 @@ class EngineClass:
             results["test_acc"].append(test_acc)
         return results
 
+    def train_model(self, train_dataloader, test_dataloader):
+        EPOCHS=10
+        engine = EngineViT(
+            model=model,
+            optimizer=optimizer,
+            loss_fn=loss_fn,
+            device=device
+        )
+        results = engine.train(
+            train_dataloader=train_dataloader,
+            test_dataloader=test_dataloader,
+            epochs=EPOCHS
+        )
+        return results
+
+    @staticmethod
+    def transform_pipeline_manually(IMG_SIZE):
+        return transforms.Compose([
+            transforms.Resize((IMG_SIZE, IMG_SIZE)),
+            transforms.ToTensor(),
+        ])
+
+    @staticmethod
+    def freeze_base_parameters(pretrained_vit):
+        for parameter in pretrained_vit.parameters():
+            parameter.requires_grad = False
+        return parameter
+
     @staticmethod
     def create_dataloaders(
         train_dir: str,
         test_dir: str,
         transform: transforms.Compose,
         batch_size: int,
-        num_workers: int=NUM_WORKERS
+        num_workers: int= os.cpu_count()
     ):
         """Creates training and testing DataLoaders.
 
@@ -111,7 +134,7 @@ class EngineClass:
                                     transform=some_transform,
                                     batch_size=32,
                                     num_workers=4)
-    """
+        """
         # Use ImageFolder to create dataset(s)
         train_data = datasets.ImageFolder(train_dir, transform=transform)
         test_data = datasets.ImageFolder(test_dir, transform=transform)
@@ -137,7 +160,7 @@ class EngineClass:
 
         return train_dataloader, test_dataloader, class_names
 
-
+        
     @staticmethod
     def set_seeds(seed: int=42):
         """Sets random sets for torch operations.
@@ -147,11 +170,10 @@ class EngineClass:
         """
         # Set the seed for general torch operations
         torch.manual_seed(seed)
-        if  torch.backends.mps.is_available():
-            torch.mps.manual_seed(seed)
         # Set the seed for CUDA torch operations (ones that happen on the GPU)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+
+
 
     # Plot loss curves of a model
     @staticmethod
@@ -191,79 +213,19 @@ class EngineClass:
         plt.xlabel("Epochs")
         plt.legend()
         plt.show()
-    
-    @staticmethod
-    def download_data(source: str,
-                    destination: str,
-                    remove_source: bool = True) -> Path:
-        """Downloads a zipped dataset from source and unzips to destination.
 
-        Args:
-            source (str): A link to a zipped file containing data.
-            destination (str): A target directory to unzip data to.
-            remove_source (bool): Whether to remove the source after downloading and extracting.
 
-        Returns:
-            pathlib.Path to downloaded data.
-
-        Example usage:
-            download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
-                        destination="pizza_steak_sushi")
-        """
-        # Setup path to data folder
-        data_path = Path("data/")
-        image_path = data_path / destination
-
-        # If the image folder doesn't exist, download it and prepare it...
-        if image_path.is_dir():
-            print(f"[INFO] {image_path} directory exists, skipping download.")
-        else:
-            print(f"[INFO] Did not find {image_path} directory, creating one...")
-            image_path.mkdir(parents=True, exist_ok=True)
-
-            # Download pizza, steak, sushi data
-            target_file = Path(source).name
-            with open(data_path / target_file, "wb") as f:
-                request = requests.get(source)
-                print(f"[INFO] Downloading {target_file} from {source}...")
-                f.write(request.content)
-
-            # Unzip pizza, steak, sushi data
-            with zipfile.ZipFile(data_path / target_file, "r") as zip_ref:
-                print(f"[INFO] Unzipping {target_file} data...")
-                zip_ref.extractall(image_path)
-
-            # Remove .zip file
-            if remove_source:
-                os.remove(data_path / target_file)
-
-        return image_path
-    @staticmethod
-    def transform_pipeline_manually(IMG_SIZE):
-
-        return transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.ToTensor(),
-    ])
-    
-    @staticmethod    
-    def freeze_base_parameters(pretrained_vit):
-    # freeze base parameters
-        for parameter in pretrained_vit.parameters():
-            parameter.requires_grad = False
-
-        return parameter    
     @staticmethod
     def prepare_data():
-        image_path = EngineClass.download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
+        image_path = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
                                 destination="pizza_steak_sushi")
         TRAIN_DIR = image_path / "train"
         TEST_DIR = image_path / "test"
         IMG_SIZE = 224
         BATCH_SIZE = 32
 
-        manual_transforms = EngineClass.transform_pipeline_manually(IMG_SIZE)
-        train_dataloader, test_dataloader, class_names = EngineClass.create_dataloaders(
+        manual_transforms = EngineViT.transform_pipeline_manually(IMG_SIZE)
+        train_dataloader, test_dataloader, class_names = EngineViT.create_dataloaders(
             train_dir=TRAIN_DIR,
             test_dir=TEST_DIR,
             transform=manual_transforms,
@@ -273,63 +235,90 @@ class EngineClass:
 
     @staticmethod
     def setup_model(class_names, TRAIN_DIR, TEST_DIR, IMG_SIZE, BATCH_SIZE):
+            pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
+            pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
 
-        COLOR_CHANNELS = 3  # RGB color channels
-        LATENT_DIM = 768  # the hidden size of the Transformer encoder
-        
-        pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
-        pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
+            EngineViT.freeze_base_parameters(pretrained_vit)
+            EngineViT.set_seeds()
+            pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
 
-        EngineClass.freeze_base_parameters(pretrained_vit)
-        EngineClass.set_seeds()
-        pretrained_vit.heads = nn.Linear(in_features=LATENT_DIM, out_features=len(class_names)).to(device)
+            summary(model=pretrained_vit,
+                    input_size=(1, 3, 224, 224),
+                    col_names=["input_size", "output_size", "num_params", "trainable"],
+                    col_width=20,
+                    row_settings=["var_names"]
+                )
 
-        summary(model=pretrained_vit,
-                input_size=(1, COLOR_CHANNELS, IMG_SIZE, IMG_SIZE),
-                col_names=["input_size", "output_size", "num_params", "trainable"],
-                col_width=20,
-                row_settings=["var_names"]
+            vit_transforms = pretrained_vit_weights.transforms()
+            train_dataloader_pretrained, test_dataloader_pretrained, _ = EngineViT.create_dataloaders(
+                train_dir=TRAIN_DIR,
+                test_dir=TEST_DIR,
+                transform=vit_transforms,
+                batch_size=32
             )
+            optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=1e-3)
+            loss_fn = torch.nn.CrossEntropyLoss()
 
-        vit_transforms = pretrained_vit_weights.transforms()
-        train_dataloader_pretrained, test_dataloader_pretrained, _ = EngineClass.create_dataloaders(
-            train_dir=TRAIN_DIR,
-            test_dir=TEST_DIR,
-            transform=vit_transforms,
-            batch_size=BATCH_SIZE
-        )
-        optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=1e-3)
-        loss_fn = torch.nn.CrossEntropyLoss()
+            return pretrained_vit, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
+    
+    
 
-        return pretrained_vit, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
+def download_data(source: str,
+                  destination: str,
+                  remove_source: bool = True) -> Path:
+    """Downloads a zipped dataset from source and unzips to destination.
 
-    @staticmethod
-    def train_model(model, optimizer, loss_fn, train_dataloader, test_dataloader):
-        engine = EngineClass(
-            model=model,
-            optimizer=optimizer,
-            loss_fn=loss_fn,
-            device=device
-        )
-        results = engine.train(
-            train_dataloader=train_dataloader,
-            test_dataloader=test_dataloader,
-            epochs=10
-        )
-        return results
+    Args:
+        source (str): A link to a zipped file containing data.
+        destination (str): A target directory to unzip data to.
+        remove_source (bool): Whether to remove the source after downloading and extracting.
+
+    Returns:
+        pathlib.Path to downloaded data.
+
+    Example usage:
+        download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
+                      destination="pizza_steak_sushi")
+    """
+    # Setup path to data folder
+    data_path = Path("data/")
+    image_path = data_path / destination
+
+    # If the image folder doesn't exist, download it and prepare it...
+    if image_path.is_dir():
+        print(f"[INFO] {image_path} directory exists, skipping download.")
+    else:
+        print(f"[INFO] Did not find {image_path} directory, creating one...")
+        image_path.mkdir(parents=True, exist_ok=True)
+
+        # Download pizza, steak, sushi data
+        target_file = Path(source).name
+        with open(data_path / target_file, "wb") as f:
+            request = requests.get(source)
+            print(f"[INFO] Downloading {target_file} from {source}...")
+            f.write(request.content)
+
+        # Unzip pizza, steak, sushi data
+        with zipfile.ZipFile(data_path / target_file, "r") as zip_ref:
+            print(f"[INFO] Unzipping {target_file} data...")
+            zip_ref.extractall(image_path)
+
+        # Remove .zip file
+        if remove_source:
+            os.remove(data_path / target_file)
+
+    return image_path
+
 
 if __name__=="__main__":
 
-    engine = EngineClass(None, None, None, device)
-    engine.set_seeds()
+    
+    train_dataloader, test_dataloader, class_names, train_dir, test_dir,  IMG_SIZE, BATCH_SIZE = EngineViT.prepare_data()
+    
+    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = EngineViT.setup_model(class_names, train_dir, test_dir,  IMG_SIZE, BATCH_SIZE)
 
-    train_dataloader, test_dataloader, class_names, train_dir, test_dir, img_size, batch_size = engine.prepare_data()
-    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = engine.setup_model(class_names, train_dir, test_dir, img_size, batch_size)
+    engine = EngineViT(model=model, optimizer=optimizer, loss_fn=loss_fn, device=device)
 
-    epochs = 10
-    engine.model = model
-    engine.loss_fn = loss_fn
-    engine.optimizer = optimizer
-
-    results = engine.train(train_dataloader_pretrained, test_dataloader_pretrained, epochs)
-    engine.plot_loss_curves(results)
+    results = engine.train_model(train_dataloader_pretrained, test_dataloader_pretrained)
+    
+    EngineViT.plot_loss_curves(results)
