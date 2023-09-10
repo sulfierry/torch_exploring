@@ -249,83 +249,69 @@ def freeze_base_parameters(pretrained_vit):
 
   return parameter    
 
-
-
-if __name__=="__main__":
-        
+def prepare_data():
     image_path = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
-                            destination="pizza_steak_sushi")
-
-    # Setup directory paths to train and test images
+                               destination="pizza_steak_sushi")
     TRAIN_DIR = image_path / "train"
     TEST_DIR = image_path / "test"
-
-    # Create image size (from Table 3 in the ViT paper)
     IMG_SIZE = 224
+    BATCH_SIZE = 32
 
-    # Set the batch size
-    BATCH_SIZE = 32 # this is lower than the ViT paper but it's because we're starting small
-
-    # Create transform pipeline manually
     manual_transforms = transform_pipeline_manually(IMG_SIZE)
-
-    # Create data loaders
     train_dataloader, test_dataloader, class_names = create_dataloaders(
         train_dir=TRAIN_DIR,
         test_dir=TEST_DIR,
-        transform=manual_transforms, # use manually created transforms
+        transform=manual_transforms,
         batch_size=BATCH_SIZE
     )
+    return train_dataloader, test_dataloader, class_names, TRAIN_DIR, TEST_DIR
 
-    # get pretrained weights for ViT-Base
+
+def setup_model(train_dataloader, class_names, TRAIN_DIR, TEST_DIR):
     pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
-
-    # setup ViT model instance with pretrained weights
     pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
 
-    parameter = freeze_base_parameters(pretrained_vit)
-
-    # update the classifier head
+    freeze_base_parameters(pretrained_vit)
     set_seeds()
     pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
 
-    # get a summary using torchinfo.summary
     summary(model=pretrained_vit,
-            input_size=(1, 3, 224, 224), # (batch_size, color_channels, height, width, number_of_patches, )
+            input_size=(1, 3, 224, 224),
             col_names=["input_size", "output_size", "num_params", "trainable"],
             col_width=20,
             row_settings=["var_names"]
-        )
+           )
 
-    # get automatic fransforms from pretrained ViT weights
     vit_transforms = pretrained_vit_weights.transforms()
-
-    # setup dataloaders
-    train_dataloader_pretrained, test_dataloader_pretrained, class_names = create_dataloaders(train_dir=TRAIN_DIR,
-                                                                                                        test_dir=TEST_DIR,
-                                                                                                        transform=vit_transforms,
-                                                                                                        batch_size=32
-                                                                                                        )
-    # create optimizer and loss function
-    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(),
-                                lr=1e-3)
-                                
+    train_dataloader_pretrained, test_dataloader_pretrained, _ = create_dataloaders(
+        train_dir=TRAIN_DIR,
+        test_dir=TEST_DIR,
+        transform=vit_transforms,
+        batch_size=32
+    )
+    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=1e-3)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    # Primeiro, você instancia a classe EngineClass
+    return pretrained_vit, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
+
+
+def train_model(model, optimizer, loss_fn, train_dataloader, test_dataloader):
     engine = EngineClass(
-        model=pretrained_vit,
+        model=model,
         optimizer=optimizer,
         loss_fn=loss_fn,
         device=device
     )
-
-    # Então, você chama o método train
-    pretrained_vit_results = engine.train(
-        train_dataloader=train_dataloader_pretrained,
-        test_dataloader=test_dataloader_pretrained,
+    results = engine.train(
+        train_dataloader=train_dataloader,
+        test_dataloader=test_dataloader,
         epochs=10
     )
+    return results
 
-    print(summary)
-    plot_loss_curves(pretrained_vit_results)
+if __name__=="__main__":
+    train_dataloader, test_dataloader, class_names, TRAIN_DIR, TEST_DIR = prepare_data()
+    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(train_dataloader, class_names, TEST_DIR, TEST_DIR)
+    results = train_model(model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained)
+    
+    plot_loss_curves(results)
