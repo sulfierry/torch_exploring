@@ -234,7 +234,11 @@ class EngineViT:
         return train_dataloader, test_dataloader, class_names, TRAIN_DIR, TEST_DIR, IMG_SIZE, BATCH_SIZE
 
     @staticmethod
-    def setup_model(class_names, TRAIN_DIR, TEST_DIR, IMG_SIZE, BATCH_SIZE):
+    def setup_model(class_names, TRAIN_DIR, TEST_DIR, IMG_SIZE, BATCH_SIZE, LEARNING_RATE):
+            
+            COLOR_CHANNELS = 3
+            NUMBER_OF_IMAGE_ANALYSED_PER_TIME = 1
+
             pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
             pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
 
@@ -243,7 +247,7 @@ class EngineViT:
             pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
 
             summary(model=pretrained_vit,
-                    input_size=(1, 3, 224, 224),
+                    input_size=(NUMBER_OF_IMAGE_ANALYSED_PER_TIME, COLOR_CHANNELS, IMG_SIZE, IMG_SIZE),
                     col_names=["input_size", "output_size", "num_params", "trainable"],
                     col_width=20,
                     row_settings=["var_names"]
@@ -254,9 +258,9 @@ class EngineViT:
                 train_dir=TRAIN_DIR,
                 test_dir=TEST_DIR,
                 transform=vit_transforms,
-                batch_size=32
+                batch_size=BATCH_SIZE
             )
-            optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=1e-3)
+            optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=LEARNING_RATE)
             loss_fn = torch.nn.CrossEntropyLoss()
 
             return pretrained_vit, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
@@ -313,9 +317,9 @@ def download_data(source: str,
 if __name__=="__main__":
 
     
-    train_dataloader, test_dataloader, class_names, train_dir, test_dir,  IMG_SIZE, BATCH_SIZE = EngineViT.prepare_data()
+    train_dataloader, test_dataloader, class_names, train_dir, test_dir,  img_size, batch_size = EngineViT.prepare_data()
     
-    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = EngineViT.setup_model(class_names, train_dir, test_dir,  IMG_SIZE, BATCH_SIZE)
+    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = EngineViT.setup_model(class_names, train_dir, test_dir,  img_size, batch_size, LEARNING_RATE=0.01)
 
     engine = EngineViT(model=model, optimizer=optimizer, loss_fn=loss_fn, device=device)
 
