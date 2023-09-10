@@ -25,7 +25,7 @@ device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is
 
 
 
-class EngineClass:
+class EngineViT:
     def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
         self.model = model.to(device)
         self.optimizer = optimizer
@@ -299,7 +299,7 @@ def train_model(model, optimizer, loss_fn, train_dataloader, test_dataloader):
 
     EPOCHS = 10
 
-    engine = EngineClass(
+    engine = EngineViT(
         model=model,
         optimizer=optimizer,
         loss_fn=loss_fn,
