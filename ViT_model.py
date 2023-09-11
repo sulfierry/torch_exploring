@@ -301,15 +301,16 @@ def setup_model(class_names,
            )
 
     vit_transforms = PRE_TRAINED_VIT_WEIGHTS.transforms()
-
     train_dataloader_pretrained, test_dataloader_pretrained, _ = create_dataloaders(
         train_dir=TRAIN_DIR,
         test_dir=TEST_DIR,
         transform=vit_transforms,
         batch_size=BATCH_SIZE
     )
+    optimizer = torch.optim.Adam(params=PRE_TRAINED_VIT.parameters(), lr=LEARNING_RATE)
+    loss_fn = torch.nn.CrossEntropyLoss()
 
-    return PRE_TRAINED_VIT, train_dataloader_pretrained, test_dataloader_pretrained
+    return PRE_TRAINED_VIT, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
 
 
 if __name__=="__main__":
@@ -320,11 +321,6 @@ if __name__=="__main__":
     TRAIN_DIR = IMAGE_PATH / "train"
     TEST_DIR = IMAGE_PATH / "test"
 
-    # PRE-TRAINED ViT
-    PRE_TRAINED_VIT_WEIGHTS = torchvision.models.ViT_B_16_Weights.DEFAULT
-    PRE_TRAINED_VIT = torchvision.models.vit_b_16(weights=PRE_TRAINED_VIT_WEIGHTS).to(device)
-
-
     # INPUTS
     EMBEDDING_DIM = 768
     LEARNING_RATE = 1e-3
@@ -333,22 +329,24 @@ if __name__=="__main__":
     IMG_SIZE = 224
     EPOCHS = 10
     CLASS_NAMES = get_class_names(TRAIN_DIR)
-    OPTIMIZER = torch.optim.Adam(params=PRE_TRAINED_VIT.parameters(), lr=LEARNING_RATE)
-    LOSS_FUNCTION = torch.nn.CrossEntropyLoss()
+    
+    # PRE-TRAINED ViT
+    PRE_TRAINED_VIT_WEIGHTS = torchvision.models.ViT_B_16_Weights.DEFAULT
+    PRE_TRAINED_VIT = torchvision.models.vit_b_16(weights=PRE_TRAINED_VIT_WEIGHTS).to(device)
 
     # EXECUTION
-    model, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(CLASS_NAMES, 
-                                                                                 TRAIN_DIR, 
-                                                                                 TEST_DIR, 
-                                                                                 COLOR_CHANNELS, 
-                                                                                 BATCH_SIZE, 
-                                                                                 IMG_SIZE, 
-                                                                                 EMBEDDING_DIM, 
-                                                                                 LEARNING_RATE,
-                                                                                 PRE_TRAINED_VIT_WEIGHTS,
-                                                                                 PRE_TRAINED_VIT)
+    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(CLASS_NAMES, 
+                                                                                                     TRAIN_DIR, 
+                                                                                                     TEST_DIR, 
+                                                                                                     COLOR_CHANNELS, 
+                                                                                                     BATCH_SIZE, 
+                                                                                                     IMG_SIZE, 
+                                                                                                     EMBEDDING_DIM, 
+                                                                                                     LEARNING_RATE,
+                                                                                                     PRE_TRAINED_VIT_WEIGHTS,
+                                                                                                     PRE_TRAINED_VIT)
     
-    engine = EngineViT(model=model, optimizer=OPTIMIZER, loss_fn=LOSS_FUNCTION, device=device)
+    engine = EngineViT(model=model, optimizer=optimizer, loss_fn=loss_fn, device=device)
     
     results = engine.train_model(train_dataloader_pretrained, test_dataloader_pretrained, EPOCHS)
     
