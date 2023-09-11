@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors
+import matplotlib.colors
 import matplotlib.patches as patches
 
 class PDBVoxel:
@@ -134,6 +135,46 @@ def pdb_to_voxel_property(parsed_pdb, voxel_instance):
                     property_grid[tuple(voxel_coord)] = aa_property
     return property_grid
 
+def pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance):
+    aa_grid = np.empty(voxel_instance.voxel_grid.shape, dtype=object)
+    for atom_section in ["chains", "cofactors", "ligands"]:
+        for atom_details in parsed_pdb[atom_section]:
+            voxel_coord = voxel_instance.coord_to_voxel(np.array(atom_details["coord"]))
+            if voxel_coord is not None:
+                aa_grid[tuple(voxel_coord)] = atom_details['res_name']
+    return aa_grid
+
+def project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid, axis=2):
+    projection_sum = np.sum(voxel_instance.voxel_grid, axis=axis)
+    property_projection = np.empty(projection_sum.shape, dtype=object)
+    aa_projection = np.empty(projection_sum.shape, dtype=object)
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if axis == 0:
+                properties_in_column = property_grid[x, y, :]
+                aas_in_column = aa_grid[x, y, :]
+            elif axis == 1:
+                properties_in_column = property_grid[x, :, y]
+                aas_in_column = aa_grid[x, :, y]
+            else:
+                properties_in_column = property_grid[:, x, y]
+                aas_in_column = aa_grid[:, x, y]
+            
+            properties_in_column = [prop for prop in properties_in_column if prop]
+            aas_in_column = [aa for aa in aas_in_column if aa]
+            
+            if properties_in_column:
+                unique, counts = np.unique(properties_in_column, return_counts=True)
+                predominant_property = unique[np.argmax(counts)]
+                property_projection[x, y] = predominant_property
+
+            if aas_in_column:
+                unique, counts = np.unique(aas_in_column, return_counts=True)
+                predominant_aa = unique[np.argmax(counts)]
+                aa_projection[x, y] = predominant_aa
+
+    return projection_sum, property_projection, aa_projection
+
 
 def project_sum_with_property(voxel_instance, property_grid, axis=2):
     projection_sum = np.sum(voxel_instance.voxel_grid, axis=axis)
@@ -173,8 +214,57 @@ def plot_projection_with_property(projection_sum, property_projection):
     plt.show()
 
 
+def plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection):
+    """Plot the projection with white amino acid names and borders around the perimeter of non-empty voxels."""
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    # Use the palette for amino acid properties
+    colored_projection = np.zeros(projection_sum.shape + (3,))
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if property_projection[x, y]:
+                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
+                intensity = projection_sum[x, y] / projection_sum.max()
+                colored_projection[x, y] = [c * intensity for c in color]
+    
+    ax.imshow(colored_projection)
+    ax.set_title('Sum Projection with Specific Amino Acids')
+    
+    # Add labels (amino acid names) to each colored square with white font
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if aa_projection[x, y]:
+                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='white')
+                # Draw a white border around the square
+                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='white', facecolor='none')
+                ax.add_patch(rect)
+    
+    patches_list = [patches.Patch(color=PDBVoxel.COLOR_PALETTE[prop], label=prop) for prop in PDBVoxel.COLOR_PALETTE]
+    ax.legend(handles=patches_list, loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.tight_layout()
+    plt.show()
+
+def project_sum_with_amino_acid(voxel_instance, aa_grid, axis=2):
+    projection_sum = np.sum(voxel_instance.voxel_grid, axis=axis)
+    aa_projection = np.empty(projection_sum.shape, dtype=object)
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if axis == 0:
+                aas_in_column = aa_grid[x, y, :]
+            elif axis == 1:
+                aas_in_column = aa_grid[x, :, y]
+            else:
+                aas_in_column = aa_grid[:, x, y]
+            aas_in_column = [aa for aa in aas_in_column if aa]
+            if aas_in_column:
+                unique, counts = np.unique(aas_in_column, return_counts=True)
+                predominant_aa = unique[np.argmax(counts)]
+                aa_projection[x, y] = predominant_aa
+    return projection_sum, aa_projection
+
+
 # Initializing and running
-grid_dim = [15, 15, 15]
+grid_dim = [10, 10, 10]
 grid_size = 1.0
 center = np.array([17.773, 63.285, 121.743])
 file_path = "./3c9t.pdb"
@@ -183,5 +273,6 @@ voxel_instance = PDBVoxel(None, np.zeros(grid_dim), None, center, grid_size)
 parsed_pdb = voxel_instance.parse_pdb(file_path)
 voxel_instance.pdb_to_voxel_atom(parsed_pdb)
 property_grid = pdb_to_voxel_property(parsed_pdb, voxel_instance)
-projection_sum, property_projection = project_sum_with_property(voxel_instance, property_grid)
-plot_projection_with_property(projection_sum, property_projection)
+aa_grid = pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance)
+projection_sum, property_projection, aa_projection = project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid)
+plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
