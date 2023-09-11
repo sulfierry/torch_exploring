@@ -1,9 +1,25 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 class PDBVoxel:
 
+        # Classificação dos aminoácidos
+    PROPERTIES = {
+        'HIDROPHOBIC': ['ALA', 'ILE', 'LEU', 'MET', 'PHE', 'PRO', 'TRP', 'VAL'],
+        'POSITIVE': ['ARG', 'HIS', 'LYS'],
+        'NEUTRAL': ['ASN', 'CYS', 'GLN', 'GLY', 'SER', 'THR', 'TYR'],
+        'NEGATIVE': ['ASP', 'GLU']
+    }
+
+    # Paleta de cores com base nas propriedades
+    COLOR_PALETTE = {
+        'HIDROPHOBIC': "#FFFF00",
+        'POSITIVE': "#0000FF",
+        'NEUTRAL': "#808080",
+        'NEGATIVE': "#FF0000"
+    }
 
     def __init__(self, voxel, voxel_grid, coord, center, grid_size):
         self.voxel = voxel
@@ -60,8 +76,8 @@ class PDBVoxel:
 
         return parsed_data
     
-    def coord_to_voxel(self):
-        voxel_coord = np.floor((self.coord - self.center) / self.grid_size).astype(int)
+    def coord_to_voxel(self, coord):
+        voxel_coord = np.floor((coord - self.center) / self.grid_size).astype(int)
         if np.any(voxel_coord < 0) or np.any(voxel_coord >= self.voxel_grid.shape):
             print(f"Invalid voxel coordinates: {voxel_coord} for atom coordinate: {self.coord}")
             return None
@@ -69,20 +85,19 @@ class PDBVoxel:
 
 
     def pdb_to_voxel_atom(self, parsed_pdb):
-        voxel_grid = np.zeros(self.voxel_grid.shape, dtype=int)
+        global atom_info_grid
         atom_info_grid = np.empty(self.voxel_grid.shape, dtype=object)
-
+        
         for atom_section in ["chains", "cofactors", "ligands"]:
             for atom_details in parsed_pdb[atom_section]:
-                voxel_coord = PDBVoxel.coord_to_voxel(np.array(atom_details["coord"]), center, grid_size)
+                voxel_coord = self.coord_to_voxel(np.array(atom_details["coord"]))
                 if voxel_coord is not None:
-                    voxel_grid[tuple(voxel_coord)] = 1
+                    self.voxel_grid[tuple(voxel_coord)] = 1
                     atom_info_grid[tuple(voxel_coord)] = atom_details
 
-        return voxel_grid, atom_info_grid
+        return self.voxel_grid, atom_info_grid
 
     def pdb_to_voxel_residue(self, parsed_pdb):
-        voxel_grid = np.zeros(self.voxel_grid.shape, dtype=int)
         residue_info_grid = np.empty(self.voxel_grid.shape, dtype=object)
 
         seen_residues = set()
@@ -93,9 +108,9 @@ class PDBVoxel:
                 if residue_identifier not in seen_residues:
                     seen_residues.add(residue_identifier)
                     if atom_details['name'] == 'CA':
-                        voxel_coord = PDBVoxel.coord_to_voxel(np.array(atom_details["coord"]), center, grid_size)
+                        voxel_coord = self.coord_to_voxel(np.array(atom_details["coord"]))
                         if voxel_coord is not None:
-                            voxel_grid[tuple(voxel_coord)] = 1
+                            self.voxel_grid[tuple(voxel_coord)] = 1
                             residue_info = {
                                 'res_name': atom_details['res_name'],
                                 'chain_id': atom_details['chain_id'],
@@ -104,7 +119,7 @@ class PDBVoxel:
                             }
                             residue_info_grid[tuple(voxel_coord)] = residue_info
 
-        return voxel_grid, residue_info_grid
+        return self.voxel_grid, residue_info_grid
 
     def project_maximal(self, axis=2):
         """
@@ -112,6 +127,8 @@ class PDBVoxel:
             É útil quando a presença de um recurso (neste caso, um átomo ou aminoácido) 
             em qualquer posição ao longo de uma dimensão é considerada importante.
         """
+        if axis not in [0, 1, 2]:
+            raise ValueError("Invalid axis. Choose from 0, 1, or 2.")
         return np.max(self.voxel_grid, axis=axis)
     
     def project_sum(self, axis=2):
@@ -120,6 +137,8 @@ class PDBVoxel:
             Esta abordagem soma os valores ao longo de uma dimensão. 
             É útil quando você está interessado em saber quantos átomos ou aminoácidos existem ao longo dessa dimensão.
         """
+        if axis not in [0, 1, 2]:
+            raise ValueError("Invalid axis. Choose from 0, 1, or 2.")
         return np.sum(self.voxel_grid, axis=axis)
 
     def radial_projection(self):
@@ -129,84 +148,43 @@ class PDBVoxel:
             útil para visualizar estruturas 3D que são centralmente simétricas ou que podem ser bem representadas em termos 
             de distâncias e ângulos a partir de um ponto central.
         """
-        # As dimensões do voxel grid
-        depth, height, width = self.voxel_grid.shape
+        # Pegar o ponto central do voxel grid
+        center_voxel = np.array(self.voxel_grid.shape) // 2
 
-        # Crie uma imagem 2D vazia com a mesma largura e altura do voxel grid
-        projected_image = np.zeros((height, width))
+        # Calcular distâncias de todos os pontos ao centro
+        y, x, z = np.ogrid[:self.voxel_grid.shape[0], :self.voxel_grid.shape[1], :self.voxel_grid.shape[2]]
+        distances = np.sqrt((y - center_voxel[0])**2 + (x - center_voxel[1])**2 + (z - center_voxel[2])**2)
 
-        # Para cada voxel, calcule sua distância e ângulo ao centro
-        for z in range(depth):
-            for y in range(height):
-                for x in range(width):
-                    if self.voxel_grid[z, y, x]:  # Se houver um átomo/aminoácido neste voxel
-                        # Calcule a distância ao centro
-                        dist = np.linalg.norm(np.array([z, y, x]) - center)
-                        
-                        # Calcule o ângulo em relação ao plano XY
-                        # Por simplicidade, vamos usar apenas o ângulo em relação ao eixo Y (pode ser ajustado conforme necessário)
-                        angle = np.arctan2(x - center[2], y - center[1])
+        # Obter índice da distância máxima (ou raio máximo)
+        max_distance = int(np.max(distances))
 
-                        # Converta o ângulo para um índice de pixel
-                        # Usaremos o ângulo para determinar a posição x e a distância para determinar a posição y
-                        # operador de módulo (%) para garantir que os índices não excedam as dimensões da imagem
-                        projected_x = int((angle + np.pi) / (2 * np.pi) * width) % width
-                        projected_y = int(dist / np.linalg.norm([height, width]) * height) % height
+        # Inicializar projeção radial como zeros
+        radial_proj = np.zeros((max_distance,))
 
-                        # Defina o valor no pixel correspondente
-                        # Isso irá garantir que não tentemos definir um pixel fora das dimensões da imagem. 
-                        # Se um ponto for projetado fora da imagem, ele simplesmente será ignorado.
-                        if 0 <= projected_x < width and 0 <= projected_y < height:
-                            projected_image[projected_y, projected_x] = 1
+        for r in range(max_distance):
+            radial_proj[r] = np.sum(self.voxel_grid[distances <= r])
 
-        return projected_image
+        return radial_proj
+
+
 
 # Definição do tamanho e origem da grade
-grid_dim = [25, 25, 25]
+grid_dim = [10, 10, 10]
 grid_size = 1.0
 center = np.array([17.773, 63.285, 121.743])
 file_path = "./3c9t.pdb"
 
-# Inicializando a instância da classe PDBVoxel
-voxel_instance = PDBVoxel(None, np.zeros(grid_dim, dtype=int), None, center, grid_size)
 
-# Lendo e parseando o arquivo PDB
+# Criação de uma instância PDBVoxel
+voxel_instance = PDBVoxel(None, np.zeros(grid_dim), None, center, grid_size)
 parsed_pdb = voxel_instance.parse_pdb(file_path)
+voxel_instance.pdb_to_voxel_atom(parsed_pdb)
+projection_sum = voxel_instance.project_sum()
 
-parsed_pdb = PDBVoxel.parse_pdb(file_path)  
-atom_voxel_grid, atom_info_grid = PDBVoxel.pdb_to_voxel_atom(parsed_pdb)
-aac_voxel_grid, acc_info_grid = PDBVoxel.pdb_to_voxel_residue(parsed_pdb)
-
-print(atom_info_grid.shape)
-#plot_voxel(atom_voxel_grid)
-# plot_voxel(aac_voxel_grid)
-"""armazenar informações adicionais sobre cada átomo quando estiver preenchendo sua grade de voxels."""
-
-# atom_vector = atom_voxel_grid.flatten()
-# aac_vector = aac_voxel_grid.flatten()
-# print(atom_vector.shape, aac_vector.shape)
-
-# Aplicar a função
-projected_atom_grid = PDBVoxel.project_maximal(atom_voxel_grid)
-projected_atom_grid_sum = PDBVoxel.project_sum(atom_voxel_grid)
-projected_image = PDBVoxel.radial_projection(aac_voxel_grid, center)
-
-#projected_acc_grid = project_maximal(aac_voxel_grid)
-
-# Visualizar usando matplotlib
-plt.imshow(projected_atom_grid, cmap='gray')
-plt.title('Projected Atom Grid')
+plt.figure(figsize=(6, 6))
+plt.title('Sum Projection')
+plt.imshow(projection_sum, cmap='viridis')
+plt.colorbar(label='Total Atoms')
 plt.show()
-
-plt.imshow(projected_atom_grid_sum, cmap='gray')
-plt.title('Sum Projected Atom Grid')
-plt.show()
-
-# Visualização
-plt.imshow(projected_image, cmap='gray')
-plt.title('Radial Projection')
-plt.show()
-
-
 
 
