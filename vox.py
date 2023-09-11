@@ -28,11 +28,6 @@ class PDBVoxel:
         self.center = center
         self.grid_size = grid_size
 
-    def plot_voxels(self):
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.voxels(self.voxel_grid, edgecolor="k")
-        plt.show()
 
     def plot_voxel(self):
         fig = plt.figure()
@@ -121,15 +116,6 @@ class PDBVoxel:
 
         return self.voxel_grid, residue_info_grid
 
-    def project_maximal(self, axis=2):
-        """
-            Esta abordagem seleciona o valor máximo ao longo de uma dimensão. 
-            É útil quando a presença de um recurso (neste caso, um átomo ou aminoácido) 
-            em qualquer posição ao longo de uma dimensão é considerada importante.
-        """
-        if axis not in [0, 1, 2]:
-            raise ValueError("Invalid axis. Choose from 0, 1, or 2.")
-        return np.max(self.voxel_grid, axis=axis)
     
     def project_sum(self, axis=2):
         """
@@ -141,30 +127,6 @@ class PDBVoxel:
             raise ValueError("Invalid axis. Choose from 0, 1, or 2.")
         return np.sum(self.voxel_grid, axis=axis)
 
-    def radial_projection(self):
-        """
-            A transformação radial, ou projeção radial, é uma técnica que representa pontos 3D em um plano 2D, 
-            usando o raio e o ângulo em relação a um ponto central ou de origem. Esta abordagem pode ser particularmente 
-            útil para visualizar estruturas 3D que são centralmente simétricas ou que podem ser bem representadas em termos 
-            de distâncias e ângulos a partir de um ponto central.
-        """
-        # Pegar o ponto central do voxel grid
-        center_voxel = np.array(self.voxel_grid.shape) // 2
-
-        # Calcular distâncias de todos os pontos ao centro
-        y, x, z = np.ogrid[:self.voxel_grid.shape[0], :self.voxel_grid.shape[1], :self.voxel_grid.shape[2]]
-        distances = np.sqrt((y - center_voxel[0])**2 + (x - center_voxel[1])**2 + (z - center_voxel[2])**2)
-
-        # Obter índice da distância máxima (ou raio máximo)
-        max_distance = int(np.max(distances))
-
-        # Inicializar projeção radial como zeros
-        radial_proj = np.zeros((max_distance,))
-
-        for r in range(max_distance):
-            radial_proj[r] = np.sum(self.voxel_grid[distances <= r])
-
-        return radial_proj
 
 
 
