@@ -1,38 +1,36 @@
+import os
 import torch
-from torchvision import transforms
-import torchvision
-from torch import nn
-
-
-import torchvision
-from pathlib import Path
 import zipfile
 import requests
-import os
-
-import torch
-from typing import Tuple, Dict, List
+import torchvision
+from torch import nn
 from tqdm import tqdm
-
-# getting a visual summary of our ViT model
+from pathlib import Path
 from torchinfo import summary
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-
 import matplotlib.pyplot as plt
+from typing import Tuple, Dict, List
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+
 
 device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 
 
 
 class EngineViT:
-    def __init__(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, loss_fn: torch.nn.Module, device: torch.device):
+
+    def __init__(self, model: torch.nn.Module, 
+                 optimizer: torch.optim.Optimizer, 
+                 loss_fn: torch.nn.Module, 
+                 device: torch.device):
+        
         self.model = model.to(device)
         self.optimizer = optimizer
         self.loss_fn = loss_fn
         self.device = device
 
     def train_step(self, dataloader: torch.utils.data.DataLoader) -> Tuple[float, float]:
+
         self.model.train()
         train_loss, train_acc = 0, 0
         for batch, (X, y) in enumerate(dataloader):
@@ -64,7 +62,11 @@ class EngineViT:
         test_acc = test_acc / len(dataloader)
         return test_loss, test_acc
 
-    def train(self, train_dataloader: torch.utils.data.DataLoader, test_dataloader: torch.utils.data.DataLoader, epochs: int) -> Dict[str, List[float]]:
+    def train(self, 
+              train_dataloader: torch.utils.data.DataLoader, 
+              test_dataloader: torch.utils.data.DataLoader, 
+              epochs: int) -> Dict[str, List[float]]:
+        
         results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
         for epoch in tqdm(range(epochs)):
             train_loss, train_acc = self.train_step(dataloader=train_dataloader)
@@ -76,7 +78,10 @@ class EngineViT:
             results["test_acc"].append(test_acc)
         return results
 
-    def train_model(self, train_dataloader, test_dataloader, EPOCHS):
+    def train_model(self,
+                    train_dataloader, 
+                    test_dataloader, 
+                    EPOCHS):
         
         engine = EngineViT(
             model=model,
@@ -264,34 +269,26 @@ def freeze_base_parameters(pretrained_vit):
 
   return parameter    
 
-def prepare_data():
-    image_path = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
-                               destination="pizza_steak_sushi")
-    TRAIN_DIR = image_path / "train"
-    TEST_DIR = image_path / "test"
-    IMG_SIZE = 224
-    BATCH_SIZE = 32
+def get_class_names(TRAIN_DIR):
 
-    manual_transforms = transform_pipeline_manually(IMG_SIZE)
-    train_dataloader, test_dataloader, class_names = create_dataloaders(
-        train_dir=TRAIN_DIR,
-        test_dir=TEST_DIR,
-        transform=manual_transforms,
-        batch_size=BATCH_SIZE
-    )
-    return train_dataloader, test_dataloader, class_names, TRAIN_DIR, TEST_DIR
+    train_data = datasets.ImageFolder(TRAIN_DIR)
+
+    class_names = train_data.classes
+
+    return class_names
 
 
-def setup_model(train_dataloader, class_names, TRAIN_DIR, TEST_DIR):
+def setup_model(class_names, TRAIN_DIR, TEST_DIR, COLOR_CHANNELS, BATCH_SIZE, IMG_SIZE, EMBEDDING_DIM, LEARNING_RATE):
+
     pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
     pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
 
     freeze_base_parameters(pretrained_vit)
     set_seeds()
-    pretrained_vit.heads = nn.Linear(in_features=768, out_features=len(class_names)).to(device)
+    pretrained_vit.heads = nn.Linear(in_features=EMBEDDING_DIM, out_features=len(class_names)).to(device)
 
     summary(model=pretrained_vit,
-            input_size=(32, 3, 224, 224),
+            input_size=(BATCH_SIZE, COLOR_CHANNELS, IMG_SIZE, IMG_SIZE),
             col_names=["input_size", "output_size", "num_params", "trainable"],
             col_width=20,
             row_settings=["var_names"]
@@ -302,9 +299,9 @@ def setup_model(train_dataloader, class_names, TRAIN_DIR, TEST_DIR):
         train_dir=TRAIN_DIR,
         test_dir=TEST_DIR,
         transform=vit_transforms,
-        batch_size=32
+        batch_size=BATCH_SIZE
     )
-    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=LEARNING_RATE)
     loss_fn = torch.nn.CrossEntropyLoss()
 
     return pretrained_vit, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
@@ -312,11 +309,35 @@ def setup_model(train_dataloader, class_names, TRAIN_DIR, TEST_DIR):
 
 if __name__=="__main__":
 
-    
-    train_dataloader, test_dataloader, class_names, train_dir, test_dir = prepare_data()
-    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(train_dataloader, class_names, train_dir, test_dir)
-    engine = EngineViT(model=model, optimizer=optimizer, loss_fn=loss_fn, device=device)
+    # PATHS
+    IMAGE_PATH = download_data(source="https://github.com/mrdbourke/pytorch-deep-learning/raw/main/data/pizza_steak_sushi.zip",
+                               destination="pizza_steak_sushi")
+    TRAIN_DIR = IMAGE_PATH / "train"
+    TEST_DIR = IMAGE_PATH / "test"
 
-    results = engine.train_model(train_dataloader_pretrained, test_dataloader_pretrained, EPOCHS=10)
+    # INPUTS
+    EMBEDDING_DIM = 768
+    LEARNING_RATE = 1e-3
+    COLOR_CHANNELS = 3
+    BATCH_SIZE = 32
+    IMG_SIZE = 224
+    EPOCHS = 10
+    CLASS_NAMES = get_class_names(TRAIN_DIR)
+    
+
+    
+    # EXECUTION
+    model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(CLASS_NAMES, 
+                                                                                                     TRAIN_DIR, 
+                                                                                                     TEST_DIR, 
+                                                                                                     COLOR_CHANNELS, 
+                                                                                                     BATCH_SIZE, 
+                                                                                                     IMG_SIZE, 
+                                                                                                     EMBEDDING_DIM, 
+                                                                                                     LEARNING_RATE)
+    
+    engine = EngineViT(model=model, optimizer=optimizer, loss_fn=loss_fn, device=device)
+    
+    results = engine.train_model(train_dataloader_pretrained, test_dataloader_pretrained, EPOCHS)
     
     plot_loss_curves(results)
