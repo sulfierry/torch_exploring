@@ -278,33 +278,39 @@ def get_class_names(TRAIN_DIR):
     return class_names
 
 
-def setup_model(class_names, TRAIN_DIR, TEST_DIR, COLOR_CHANNELS, BATCH_SIZE, IMG_SIZE, EMBEDDING_DIM, LEARNING_RATE):
+def setup_model(class_names, 
+                TRAIN_DIR, 
+                TEST_DIR, 
+                COLOR_CHANNELS, 
+                BATCH_SIZE, 
+                IMG_SIZE, 
+                EMBEDDING_DIM, 
+                LEARNING_RATE, 
+                PRE_TRAINED_VIT_WEIGHTS, 
+                PRE_TRAINED_VIT):
 
-    pretrained_vit_weights = torchvision.models.ViT_B_16_Weights.DEFAULT
-    pretrained_vit = torchvision.models.vit_b_16(weights=pretrained_vit_weights).to(device)
-
-    freeze_base_parameters(pretrained_vit)
+    freeze_base_parameters(PRE_TRAINED_VIT)
     set_seeds()
-    pretrained_vit.heads = nn.Linear(in_features=EMBEDDING_DIM, out_features=len(class_names)).to(device)
+    PRE_TRAINED_VIT.heads = nn.Linear(in_features=EMBEDDING_DIM, out_features=len(class_names)).to(device)
 
-    summary(model=pretrained_vit,
+    summary(model=PRE_TRAINED_VIT,
             input_size=(BATCH_SIZE, COLOR_CHANNELS, IMG_SIZE, IMG_SIZE),
             col_names=["input_size", "output_size", "num_params", "trainable"],
             col_width=20,
             row_settings=["var_names"]
            )
 
-    vit_transforms = pretrained_vit_weights.transforms()
+    vit_transforms = PRE_TRAINED_VIT_WEIGHTS.transforms()
     train_dataloader_pretrained, test_dataloader_pretrained, _ = create_dataloaders(
         train_dir=TRAIN_DIR,
         test_dir=TEST_DIR,
         transform=vit_transforms,
         batch_size=BATCH_SIZE
     )
-    optimizer = torch.optim.Adam(params=pretrained_vit.parameters(), lr=LEARNING_RATE)
+    optimizer = torch.optim.Adam(params=PRE_TRAINED_VIT.parameters(), lr=LEARNING_RATE)
     loss_fn = torch.nn.CrossEntropyLoss()
 
-    return pretrained_vit, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
+    return PRE_TRAINED_VIT, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained
 
 
 if __name__=="__main__":
@@ -324,8 +330,10 @@ if __name__=="__main__":
     EPOCHS = 10
     CLASS_NAMES = get_class_names(TRAIN_DIR)
     
+    # PRE-TRAINED ViT
+    PRE_TRAINED_VIT_WEIGHTS = torchvision.models.ViT_B_16_Weights.DEFAULT
+    PRE_TRAINED_VIT = torchvision.models.vit_b_16(weights=PRE_TRAINED_VIT_WEIGHTS).to(device)
 
-    
     # EXECUTION
     model, optimizer, loss_fn, train_dataloader_pretrained, test_dataloader_pretrained = setup_model(CLASS_NAMES, 
                                                                                                      TRAIN_DIR, 
@@ -334,7 +342,9 @@ if __name__=="__main__":
                                                                                                      BATCH_SIZE, 
                                                                                                      IMG_SIZE, 
                                                                                                      EMBEDDING_DIM, 
-                                                                                                     LEARNING_RATE)
+                                                                                                     LEARNING_RATE,
+                                                                                                     PRE_TRAINED_VIT_WEIGHTS,
+                                                                                                     PRE_TRAINED_VIT)
     
     engine = EngineViT(model=model, optimizer=optimizer, loss_fn=loss_fn, device=device)
     
