@@ -108,10 +108,50 @@ def pdb_to_voxel_residue(parsed_pdb):
 
 
 def project_maximal(voxel_grid, axis=2):
+    """
+        Esta abordagem seleciona o valor máximo ao longo de uma dimensão. 
+        É útil quando a presença de um recurso (neste caso, um átomo ou aminoácido) 
+        em qualquer posição ao longo de uma dimensão é considerada importante.
+    """
     return np.max(voxel_grid, axis=axis)
 
 def project_sum(voxel_grid, axis=2):
+    """
+        Projeção de Soma:
+        Esta abordagem soma os valores ao longo de uma dimensão. 
+        É útil quando você está interessado em saber quantos átomos ou aminoácidos existem ao longo dessa dimensão.
+    """
     return np.sum(voxel_grid, axis=axis)
+
+
+def radial_projection(voxel_grid, center):
+    # As dimensões do voxel grid
+    depth, height, width = voxel_grid.shape
+
+    # Crie uma imagem 2D vazia com a mesma largura e altura do voxel grid
+    projected_image = np.zeros((height, width))
+
+    # Para cada voxel, calcule sua distância e ângulo ao centro
+    for z in range(depth):
+        for y in range(height):
+            for x in range(width):
+                if voxel_grid[z, y, x]:  # Se houver um átomo/aminoácido neste voxel
+                    # Calcule a distância ao centro
+                    dist = np.linalg.norm(np.array([z, y, x]) - center)
+                    
+                    # Calcule o ângulo em relação ao plano XY
+                    # Por simplicidade, vamos usar apenas o ângulo em relação ao eixo Y (pode ser ajustado conforme necessário)
+                    angle = np.arctan2(x - center[2], y - center[1])
+
+                    # Converta o ângulo para um índice de pixel
+                    # Usaremos o ângulo para determinar a posição x e a distância para determinar a posição y
+                    projected_x = int((angle + np.pi) / (2 * np.pi) * width)
+                    projected_y = int(dist / np.linalg.norm([height, width]) * height)
+
+                    # Defina o valor no pixel correspondente
+                    projected_image[projected_y, projected_x] = 1
+
+    return projected_image
 
 # Definição do tamanho e origem da grade
 grid_dim = [25, 25, 25]
@@ -142,4 +182,18 @@ plt.show()
 
 plt.imshow(projected_acc_grid, cmap='gray')
 plt.title('Projected Amino Acid Grid')
+plt.show()
+
+
+# Aplicar a função
+projected_atom_grid_sum = project_sum(atom_voxel_grid)
+projected_acc_grid_sum = project_sum(aac_voxel_grid)
+
+# Visualizar usando matplotlib
+plt.imshow(projected_atom_grid_sum, cmap='gray')
+plt.title('Sum Projected Atom Grid')
+plt.show()
+
+plt.imshow(projected_acc_grid_sum, cmap='gray')
+plt.title('Sum Projected Amino Acid Grid')
 plt.show()
