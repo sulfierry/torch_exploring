@@ -214,36 +214,6 @@ def plot_projection_with_property(projection_sum, property_projection):
     plt.show()
 
 
-def plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection):
-    """Plot the projection with white amino acid names and borders around the perimeter of non-empty voxels."""
-    fig, ax = plt.subplots(figsize=(10, 10))
-    
-    # Use the palette for amino acid properties
-    colored_projection = np.zeros(projection_sum.shape + (3,))
-    for x in range(projection_sum.shape[0]):
-        for y in range(projection_sum.shape[1]):
-            if property_projection[x, y]:
-                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
-                intensity = projection_sum[x, y] / projection_sum.max()
-                colored_projection[x, y] = [c * intensity for c in color]
-    
-    ax.imshow(colored_projection)
-    ax.set_title('Sum Projection with Specific Amino Acids')
-    
-    # Add labels (amino acid names) to each colored square with white font
-    for x in range(projection_sum.shape[0]):
-        for y in range(projection_sum.shape[1]):
-            if aa_projection[x, y]:
-                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='white')
-                # Draw a white border around the square
-                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='white', facecolor='none')
-                ax.add_patch(rect)
-    
-    patches_list = [patches.Patch(color=PDBVoxel.COLOR_PALETTE[prop], label=prop) for prop in PDBVoxel.COLOR_PALETTE]
-    ax.legend(handles=patches_list, loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.tight_layout()
-    plt.show()
-
 def project_sum_with_amino_acid(voxel_instance, aa_grid, axis=2):
     projection_sum = np.sum(voxel_instance.voxel_grid, axis=axis)
     aa_projection = np.empty(projection_sum.shape, dtype=object)
@@ -261,6 +231,39 @@ def project_sum_with_amino_acid(voxel_instance, aa_grid, axis=2):
                 predominant_aa = unique[np.argmax(counts)]
                 aa_projection[x, y] = predominant_aa
     return projection_sum, aa_projection
+
+def plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection):
+    """Plot the projection with amino acid property labels, borders, and amino acid names,
+    ensuring even low intensity squares are visible."""
+    
+    fig, ax = plt.subplots(figsize=(10, 10))
+    
+    colored_projection = np.zeros(projection_sum.shape + (3,))
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if property_projection[x, y]:
+                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
+                intensity = (projection_sum[x, y] + 0.5) / (projection_sum.max() + 0.5)  # Adjusted intensity
+                colored_projection[x, y] = [c * intensity for c in color]
+    
+    ax.imshow(colored_projection)
+    ax.set_title('Sum Projection with Amino Acid Properties')
+    
+    # Add property labels and borders to each colored square
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if aa_projection[x, y]:
+                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='white', fontsize=10)
+                # Draw a white border around the square
+                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='white', facecolor='none')
+                ax.add_patch(rect)
+    
+    patches_list = [patches.Patch(color=PDBVoxel.COLOR_PALETTE[prop], label=prop) for prop in PDBVoxel.COLOR_PALETTE]
+    ax.legend(handles=patches_list, loc='center left', bbox_to_anchor=(1, 0.5))
+    
+    plt.tight_layout()
+    plt.show()
+
 
 
 def plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projection, target_property):
@@ -295,7 +298,6 @@ def plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projecti
 
 
 
-
 # Initializing and running
 grid_dim = [10, 10, 10]
 grid_size = 1.0
@@ -308,9 +310,8 @@ voxel_instance.pdb_to_voxel_atom(parsed_pdb)
 property_grid = pdb_to_voxel_property(parsed_pdb, voxel_instance)
 aa_grid = pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance)
 projection_sum, property_projection, aa_projection = project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid)
+plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
 
 # Generate the plots for each amino acid property with adjusted visibility and borders
 for property_type in PDBVoxel.PROPERTIES:
     plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projection, property_type)
-
-plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
