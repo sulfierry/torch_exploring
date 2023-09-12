@@ -242,6 +242,38 @@ def plot_projection_with_strict_filters(projection_sum, aa_projection, property_
     plt.tight_layout()
     plt.show()
 
+
+def plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
+    
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            atom_count = projection_sum[x, y]
+            if aa_projection[x, y] and atom_count > 0:
+                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
+                min_intensity = 0.3
+                range_intensity = 0.7  # 1 - min_intensity
+                intensity = min_intensity + range_intensity * (atom_count / (projection_sum.max() + 0.5))
+                colored_projection[x, y] = [c * intensity for c in color]
+                
+                # Collecting atom names for the current cell
+                atoms_in_column = atom_info_grid[x, y, :]
+                atom_names = [atom["element"] for atom in atoms_in_column if atom]
+                unique_atoms, atom_counts = np.unique(atom_names, return_counts=True)
+                atom_string = ", ".join([f"{atom}{count}" for atom, count in zip(unique_atoms, atom_counts)])
+                
+                label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_string}"
+                ax.text(y, x, label, ha='center', va='center', color='white', fontsize=6)
+                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
+                ax.add_patch(rect)
+                
+    ax.imshow(colored_projection, origin='upper')
+    plt.tight_layout()
+    plt.show()
+
+
+
 def plot_projection_with_atom_names(projection_sum, aa_projection, property_projection, atom_info_grid):
     fig, ax = plt.subplots(figsize=(10, 10))
     colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
@@ -273,6 +305,10 @@ def plot_projection_with_atom_names(projection_sum, aa_projection, property_proj
     ax.imshow(colored_projection, origin='upper')
     plt.tight_layout()
     plt.show()
+
+
+
+
 
 # Limiting the number of invalid voxel coordinate warnings
 warnings_limit = 5
@@ -319,3 +355,5 @@ if __name__ == "__main__":
 
     # Re-plotting the projection with atom names included
     plot_projection_with_atom_names(projection_sum, aa_projection, property_projection, atom_info_grid)
+# Plotting the projection with the corrected representation
+    plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid)
