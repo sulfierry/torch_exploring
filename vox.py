@@ -242,6 +242,62 @@ def plot_projection_with_strict_filters(projection_sum, aa_projection, property_
     plt.tight_layout()
     plt.show()
 
+def plot_projection_with_atom_names(projection_sum, aa_projection, property_projection, atom_info_grid):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
+    
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            atom_count = projection_sum[x, y]
+            if aa_projection[x, y] and atom_count > 0:
+                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
+                min_intensity = 0.3
+                range_intensity = 0.7  # 1 - min_intensity
+                intensity = min_intensity + range_intensity * (atom_count / (projection_sum.max() + 0.5))
+                colored_projection[x, y] = [c * intensity for c in color]
+                
+                # Collecting atom names for the current cell
+                if atom_info_grid[x, y, :].shape[0] > 0:
+                    atoms_in_column = atom_info_grid[x, y, :]
+                else:
+                    atoms_in_column = atom_info_grid[:, x, y]
+                atom_names = [atom["element"] for atom in atoms_in_column if atom]
+                unique_atoms, atom_counts = np.unique(atom_names, return_counts=True)
+                atom_string = ", ".join([f"{atom}:{count}" for atom, count in zip(unique_atoms, atom_counts)])
+                
+                label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_string}"
+                ax.text(y, x, label, ha='center', va='center', color='white', fontsize=8)
+                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
+                ax.add_patch(rect)
+                
+    ax.imshow(colored_projection, origin='upper')
+    plt.tight_layout()
+    plt.show()
+
+# Limiting the number of invalid voxel coordinate warnings
+warnings_limit = 5
+warnings_count = 0
+
+# Extracting atom information grid for the current voxel representation
+def pdb_to_voxel_atom_with_limited_warnings(voxel_instance, parsed_pdb):
+    global warnings_count
+    atom_info_grid = np.empty(voxel_instance.voxel_grid.shape, dtype=object)
+    for atom_section in ["chains", "cofactors", "ligands"]:
+        for atom_details in parsed_pdb[atom_section]:
+            voxel_coord = voxel_instance.coord_to_voxel(np.array(atom_details["coord"]))
+            if voxel_coord is None:
+                if warnings_count < warnings_limit:
+                    print(f"Invalid voxel coordinates for atom coordinate: {atom_details['coord']}")
+                    warnings_count += 1
+            else:
+                voxel_instance.voxel_grid[tuple(voxel_coord)] = 1
+                atom_info_grid[tuple(voxel_coord)] = atom_details
+    if warnings_count == warnings_limit:
+        print("... More invalid voxel coordinates found. Limiting output ...")
+    return voxel_instance.voxel_grid, atom_info_grid
+
+
+
 
 if __name__ == "__main__":
 
@@ -257,5 +313,9 @@ if __name__ == "__main__":
     property_grid = pdb_to_voxel_property(parsed_pdb, voxel_instance)
     aa_grid = pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance)
     projection_sum, property_projection, aa_projection = project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid)
-    plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
-    plot_projection_with_strict_filters(projection_sum, aa_projection, property_projection)
+    #plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
+    #plot_projection_with_strict_filters(projection_sum, aa_projection, property_projection)
+    voxel_grid, atom_info_grid = pdb_to_voxel_atom_with_limited_warnings(voxel_instance, parsed_pdb)
+
+    # Re-plotting the projection with atom names included
+    plot_projection_with_atom_names(projection_sum, aa_projection, property_projection, atom_info_grid)
