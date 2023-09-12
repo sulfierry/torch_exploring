@@ -192,33 +192,55 @@ def plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projecti
 def plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection):
     """Plot the projection with amino acid property labels, borders, and amino acid names,
     ensuring even low intensity squares are visible."""
-
     fig, ax = plt.subplots(figsize=(10, 10))
 
-    colored_projection = np.ones(projection_sum.shape + (3,))  # changed zeros to ones for white color
+    colored_projection = np.ones(projection_sum.shape + (3,))  # using ones for white color
     for x in range(projection_sum.shape[0]):
         for y in range(projection_sum.shape[1]):
             if property_projection[x, y]:
                 color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
-                intensity = (projection_sum[x, y] + 0.5) / (projection_sum.max() + 0.5)
+                # adjust the intensity computation here
+                min_intensity = 0.3
+                range_intensity = 0.7  # 1 - min_intensity
+                intensity = min_intensity + range_intensity * (projection_sum[x, y] / (projection_sum.max() + 0.5))
                 colored_projection[x, y] = [c * intensity for c in color]
             elif projection_sum[x, y] == 0:
                 colored_projection[x, y] = [1, 1, 1]  # set the color to white for cells with zero intensity
 
     ax.imshow(colored_projection, origin='upper')
 
-    # Add property labels and borders to each colored square
+    # Add property labels, atom count, and borders to each colored square
     for x in range(projection_sum.shape[0]):
         for y in range(projection_sum.shape[1]):
-            if aa_projection[x, y]:
-                # Text color
-                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='white', fontsize=10)
+            atom_count = projection_sum[x, y]
+            if aa_projection[x, y] and atom_count > 0:
+                ax.text(y, x, f"{aa_projection[x, y]}\n{atom_count}", ha='center', va='center', color='white', fontsize=8)
                 rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
                 ax.add_patch(rect)
 
     plt.tight_layout()
     plt.show()
 
+def plot_projection_with_strict_filters(projection_sum, aa_projection, property_projection):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
+    
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            atom_count = projection_sum[x, y]
+            if aa_projection[x, y] and atom_count > 0:
+                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
+                min_intensity = 0.3
+                range_intensity = 0.7  # 1 - min_intensity
+                intensity = min_intensity + range_intensity * (atom_count / (projection_sum.max() + 0.5))
+                colored_projection[x, y] = [c * intensity for c in color]
+                ax.text(y, x, f"{aa_projection[x, y]}\n{atom_count}", ha='center', va='center', color='white', fontsize=8)
+                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
+                ax.add_patch(rect)
+                
+    ax.imshow(colored_projection, origin='upper')
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -236,3 +258,4 @@ if __name__ == "__main__":
     aa_grid = pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance)
     projection_sum, property_projection, aa_projection = project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid)
     plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
+    plot_projection_with_strict_filters(projection_sum, aa_projection, property_projection)
