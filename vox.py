@@ -195,13 +195,15 @@ def plot_projection_with_corrected_labels(projection_sum, aa_projection, propert
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
-    colored_projection = np.zeros(projection_sum.shape + (3,))
+    colored_projection = np.ones(projection_sum.shape + (3,))  # changed zeros to ones for white color
     for x in range(projection_sum.shape[0]):
         for y in range(projection_sum.shape[1]):
             if property_projection[x, y]:
                 color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
                 intensity = (projection_sum[x, y] + 0.5) / (projection_sum.max() + 0.5)
                 colored_projection[x, y] = [c * intensity for c in color]
+            elif projection_sum[x, y] == 0:
+                colored_projection[x, y] = [1, 1, 1]  # set the color to white for cells with zero intensity
 
     ax.imshow(colored_projection, origin='upper')
 
@@ -209,11 +211,11 @@ def plot_projection_with_corrected_labels(projection_sum, aa_projection, propert
     for x in range(projection_sum.shape[0]):
         for y in range(projection_sum.shape[1]):
             if aa_projection[x, y]:
-                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='black', fontsize=10)
+                # Text color
+                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='white', fontsize=10)
                 rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
                 ax.add_patch(rect)
 
-    ax.set_facecolor('white')  # set background color to white
     plt.tight_layout()
     plt.show()
 
