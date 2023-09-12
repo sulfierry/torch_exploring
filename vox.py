@@ -154,38 +154,6 @@ def project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid, axi
     return projection_sum, property_projection, aa_projection
 
 
-def plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection):
-    """Plot the projection with amino acid property labels, borders, and amino acid names,
-    ensuring even low intensity squares are visible."""
-    
-    fig, ax = plt.subplots(figsize=(10, 10))
-    
-    colored_projection = np.zeros(projection_sum.shape + (3,))
-    for x in range(projection_sum.shape[0]):
-        for y in range(projection_sum.shape[1]):
-            if property_projection[x, y]:
-                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
-                intensity = (projection_sum[x, y] + 0.5) / (projection_sum.max() + 0.5)  # Adjusted intensity
-                colored_projection[x, y] = [c * intensity for c in color]
-    
-    ax.imshow(colored_projection)
-    ax.set_title('Sum Projection with Amino Acid Properties')
-    
-    # Add property labels and borders to each colored square
-    for x in range(projection_sum.shape[0]):
-        for y in range(projection_sum.shape[1]):
-            if aa_projection[x, y]:
-                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='white', fontsize=10)
-                # Draw a white border around the square
-                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='white', facecolor='none')
-                ax.add_patch(rect)
-    
-    patches_list = [patches.Patch(color=PDBVoxel.COLOR_PALETTE[prop], label=prop) for prop in PDBVoxel.COLOR_PALETTE]
-    ax.legend(handles=patches_list, loc='center left', bbox_to_anchor=(1, 0.5))
-    print(f"Projection_sum: {type(projection_sum)} | AA projection: {type(aa_projection)} | Property projection: {type(property_projection)}")
-    plt.tight_layout()
-    plt.show()
-
 
 # OK
 def plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projection, target_property):
@@ -219,8 +187,40 @@ def plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projecti
     plt.show()
 
 
+
+
+def plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection):
+    """Plot the projection with amino acid property labels, borders, and amino acid names,
+    ensuring even low intensity squares are visible."""
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    colored_projection = np.zeros(projection_sum.shape + (3,))
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if property_projection[x, y]:
+                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
+                intensity = (projection_sum[x, y] + 0.5) / (projection_sum.max() + 0.5)
+                colored_projection[x, y] = [c * intensity for c in color]
+
+    ax.imshow(colored_projection, origin='upper')
+
+    # Add property labels and borders to each colored square
+    for x in range(projection_sum.shape[0]):
+        for y in range(projection_sum.shape[1]):
+            if aa_projection[x, y]:
+                ax.text(y, x, aa_projection[x, y], ha='center', va='center', color='black', fontsize=10)
+                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
+                ax.add_patch(rect)
+
+    ax.set_facecolor('white')  # set background color to white
+    plt.tight_layout()
+    plt.show()
+
+
+
 if __name__ == "__main__":
-    
+
     # Initializing and running
     grid_dim = [15, 15, 15]
     grid_size = 1.0
@@ -234,7 +234,3 @@ if __name__ == "__main__":
     aa_grid = pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance)
     projection_sum, property_projection, aa_projection = project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid)
     plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
-
-    # Generate the plots for each amino acid property with adjusted visibility and borders
-    for property_type in PDBVoxel.PROPERTIES:
-        plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projection, property_type)
