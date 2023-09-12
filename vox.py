@@ -31,12 +31,20 @@ class PDBVoxel:
     def plot_voxel(self):
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        x, y, z = np.where(self.voxel == 1)
-        ax.scatter(x, y, z, alpha=0.6, s=15, c='blue')
+        
+        where_result = np.where(self.voxel == 1)
+        
+        if len(where_result) == 3:  # Verifica se há 3 arrays para x, y e z.
+            x, y, z = where_result
+            ax.scatter(x, y, z, alpha=0.6, s=15, c='blue')
+        else:
+            print("No voxels with value 1 found or voxel array is not 3D.")
+        
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
         plt.show()
+
     # OK
     def parse_pdb(self, pdb_file_path):
         with open(pdb_file_path, 'r') as file:
@@ -86,7 +94,9 @@ class PDBVoxel:
                     self.voxel_grid[tuple(voxel_coord)] = 1
                     atom_info_grid[tuple(voxel_coord)] = atom_details
 
+        self.voxel = self.voxel_grid  # Update the voxel attribute
         return self.voxel_grid, atom_info_grid
+
 
     def get_amino_acid_property(self, res_name):
         for property, amino_acids in PDBVoxel.PROPERTIES.items():
@@ -148,62 +158,60 @@ class PDBVoxel:
 
         return projection_sum, property_projection, aa_projection
 
+    # Limiting the number of invalid voxel coordinate warnings
 
+    # Extracting atom information grid for the current voxel representation
+    @staticmethod
+    def pdb_to_voxel_atom_with_limited_warnings(voxel_instance):
+        
+        parsed_pdb = voxel_instance.parsed_pdb_data
+        global warnings_count
+        warnings_limit = 5
+        warnings_count = 0
+        atom_info_grid = np.empty(voxel_instance.voxel_grid.shape, dtype=object)
+        for atom_section in ["chains", "cofactors", "ligands"]:
+            for atom_details in parsed_pdb[atom_section]:
+                voxel_coord = voxel_instance.coord_to_voxel(np.array(atom_details["coord"]))
+                if voxel_coord is None:
+                    if warnings_count < warnings_limit:
+                        print(f"Invalid voxel coordinates for atom coordinate: {atom_details['coord']}")
+                        warnings_count += 1
+                else:
+                    voxel_instance.voxel_grid[tuple(voxel_coord)] = 1
+                    atom_info_grid[tuple(voxel_coord)] = atom_details
+        if warnings_count == warnings_limit:
+            print("... More invalid voxel coordinates found. Limiting output ...")
+        return voxel_instance.voxel_grid, atom_info_grid
 
-def plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid):
-    fig, ax = plt.subplots(figsize=(8, 8))
-    colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
-    
-    for x in range(projection_sum.shape[0]):
-        for y in range(projection_sum.shape[1]):
-            atom_count = projection_sum[x, y]
-            if aa_projection[x, y] and atom_count > 0:
-                color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
-                min_intensity = 0.3
-                range_intensity = 0.7  # 1 - min_intensity
-                intensity = min_intensity + range_intensity * (atom_count / (projection_sum.max() + 0.5))
-                colored_projection[x, y] = [c * intensity for c in color]
-                
-                # Collecting atom names for the current cell
-                atoms_in_column = atom_info_grid[x, y, :]
-                atom_names = [atom["element"] for atom in atoms_in_column if atom]
-                unique_atoms, atom_counts = np.unique(atom_names, return_counts=True)
-                atom_string = ", ".join([f"{atom}{count}" for atom, count in zip(unique_atoms, atom_counts)])
-                
-                label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_string}"
-                ax.text(y, x, label, ha='center', va='center', color='white', fontsize=6)
-                rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
-                ax.add_patch(rect)
-                
-    ax.imshow(colored_projection, origin='upper')
-    plt.tight_layout()
-    plt.show()
-
-
-# Limiting the number of invalid voxel coordinate warnings
-warnings_limit = 5
-warnings_count = 0
-
-# Extracting atom information grid for the current voxel representation
-def pdb_to_voxel_atom_with_limited_warnings(voxel_instance):
-    
-    parsed_pdb = voxel_instance.parsed_pdb_data
-    global warnings_count
-    atom_info_grid = np.empty(voxel_instance.voxel_grid.shape, dtype=object)
-    for atom_section in ["chains", "cofactors", "ligands"]:
-        for atom_details in parsed_pdb[atom_section]:
-            voxel_coord = voxel_instance.coord_to_voxel(np.array(atom_details["coord"]))
-            if voxel_coord is None:
-                if warnings_count < warnings_limit:
-                    print(f"Invalid voxel coordinates for atom coordinate: {atom_details['coord']}")
-                    warnings_count += 1
-            else:
-                voxel_instance.voxel_grid[tuple(voxel_coord)] = 1
-                atom_info_grid[tuple(voxel_coord)] = atom_details
-    if warnings_count == warnings_limit:
-        print("... More invalid voxel coordinates found. Limiting output ...")
-    return voxel_instance.voxel_grid, atom_info_grid
-
+    @staticmethod
+    def plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid):
+        fig, ax = plt.subplots(figsize=(8, 8))
+        colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
+        
+        for x in range(projection_sum.shape[0]):
+            for y in range(projection_sum.shape[1]):
+                atom_count = projection_sum[x, y]
+                if aa_projection[x, y] and atom_count > 0:
+                    color = matplotlib.colors.hex2color(PDBVoxel.COLOR_PALETTE[property_projection[x, y]])
+                    min_intensity = 0.3
+                    range_intensity = 0.7  # 1 - min_intensity
+                    intensity = min_intensity + range_intensity * (atom_count / (projection_sum.max() + 0.5))
+                    colored_projection[x, y] = [c * intensity for c in color]
+                    
+                    # Collecting atom names for the current cell
+                    atoms_in_column = atom_info_grid[x, y, :]
+                    atom_names = [atom["element"] for atom in atoms_in_column if atom]
+                    unique_atoms, atom_counts = np.unique(atom_names, return_counts=True)
+                    atom_string = ", ".join([f"{atom}{count}" for atom, count in zip(unique_atoms, atom_counts)])
+                    
+                    label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_string}"
+                    ax.text(y, x, label, ha='center', va='center', color='white', fontsize=6)
+                    rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
+                    ax.add_patch(rect)
+                    
+        ax.imshow(colored_projection, origin='upper')
+        plt.tight_layout()
+        plt.show()
 
 
 
@@ -218,6 +226,7 @@ if __name__ == "__main__":
     voxel_instance = PDBVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
     # parsed_pdb = voxel_instance.parse_pdb(file_path)
     voxel_instance.pdb_to_voxel_atom()
+    voxel_instance.plot_voxel()
 
     # Call the methods directly from the voxel_instance
     property_grid = voxel_instance.pdb_to_voxel_property()
@@ -225,10 +234,6 @@ if __name__ == "__main__":
     projection_sum, property_projection, aa_projection = voxel_instance.project_sum_with_property_and_aa()
 
     # Use the appropriate function for pdb_to_voxel_atom_with_limited_warnings if it's still needed
-    voxel_grid, atom_info_grid = pdb_to_voxel_atom_with_limited_warnings(voxel_instance)
+    voxel_grid, atom_info_grid = PDBVoxel.pdb_to_voxel_atom_with_limited_warnings(voxel_instance)
 
-    # Re-plotting the projection with atom names included
-    # plot_projection_with_atom_names(projection_sum, aa_projection, property_projection, atom_info_grid)
-    # Plotting the projection with the corrected representation
-    plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid)
-    # voxel_instance.plot_voxel()
+    PDBVoxel.plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid)
