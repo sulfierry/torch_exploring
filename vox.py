@@ -5,6 +5,7 @@ import matplotlib.colors
 import matplotlib.patches as patches
 
 class PDBVoxel:
+
     PROPERTIES = {
         'HIDROPHOBIC': ['ALA', 'ILE', 'LEU', 'MET', 'PHE', 'PRO', 'TRP', 'VAL'],
         'POSITIVE': ['ARG', 'HIS', 'LYS'],
@@ -153,24 +154,6 @@ def project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid, axi
     return projection_sum, property_projection, aa_projection
 
 
-def project_sum_with_amino_acid(voxel_instance, aa_grid, axis=2):
-    projection_sum = np.sum(voxel_instance.voxel_grid, axis=axis)
-    aa_projection = np.empty(projection_sum.shape, dtype=object)
-    for x in range(projection_sum.shape[0]):
-        for y in range(projection_sum.shape[1]):
-            if axis == 0:
-                aas_in_column = aa_grid[x, y, :]
-            elif axis == 1:
-                aas_in_column = aa_grid[x, :, y]
-            else:
-                aas_in_column = aa_grid[:, x, y]
-            aas_in_column = [aa for aa in aas_in_column if aa]
-            if aas_in_column:
-                unique, counts = np.unique(aas_in_column, return_counts=True)
-                predominant_aa = unique[np.argmax(counts)]
-                aa_projection[x, y] = predominant_aa
-    return projection_sum, aa_projection
-
 def plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection):
     """Plot the projection with amino acid property labels, borders, and amino acid names,
     ensuring even low intensity squares are visible."""
@@ -199,7 +182,7 @@ def plot_projection_with_corrected_labels(projection_sum, aa_projection, propert
     
     patches_list = [patches.Patch(color=PDBVoxel.COLOR_PALETTE[prop], label=prop) for prop in PDBVoxel.COLOR_PALETTE]
     ax.legend(handles=patches_list, loc='center left', bbox_to_anchor=(1, 0.5))
-    
+    print(f"Projection_sum: {type(projection_sum)} | AA projection: {type(aa_projection)} | Property projection: {type(property_projection)}")
     plt.tight_layout()
     plt.show()
 
