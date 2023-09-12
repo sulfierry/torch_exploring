@@ -219,21 +219,22 @@ def plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projecti
     plt.show()
 
 
+if __name__ == "__main__":
+    
+    # Initializing and running
+    grid_dim = [15, 15, 15]
+    grid_size = 1.0
+    center = np.array([17.773, 63.285, 121.743])
+    file_path = "./3c9t.pdb"
 
-# Initializing and running
-grid_dim = [15, 15, 15]
-grid_size = 1.0
-center = np.array([17.773, 63.285, 121.743])
-file_path = "./3c9t.pdb"
+    voxel_instance = PDBVoxel(None, np.zeros(grid_dim), None, center, grid_size)
+    parsed_pdb = voxel_instance.parse_pdb(file_path)
+    voxel_instance.pdb_to_voxel_atom(parsed_pdb)
+    property_grid = pdb_to_voxel_property(parsed_pdb, voxel_instance)
+    aa_grid = pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance)
+    projection_sum, property_projection, aa_projection = project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid)
+    plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
 
-voxel_instance = PDBVoxel(None, np.zeros(grid_dim), None, center, grid_size)
-parsed_pdb = voxel_instance.parse_pdb(file_path)
-voxel_instance.pdb_to_voxel_atom(parsed_pdb)
-property_grid = pdb_to_voxel_property(parsed_pdb, voxel_instance)
-aa_grid = pdb_to_voxel_amino_acid(parsed_pdb, voxel_instance)
-projection_sum, property_projection, aa_projection = project_sum_with_property_and_aa(voxel_instance, property_grid, aa_grid)
-plot_projection_with_corrected_labels(projection_sum, aa_projection, property_projection)
-
-# Generate the plots for each amino acid property with adjusted visibility and borders
-for property_type in PDBVoxel.PROPERTIES:
-    plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projection, property_type)
+    # Generate the plots for each amino acid property with adjusted visibility and borders
+    for property_type in PDBVoxel.PROPERTIES:
+        plot_projection_by_property_with_labels_adjusted(projection_sum, aa_projection, property_type)
