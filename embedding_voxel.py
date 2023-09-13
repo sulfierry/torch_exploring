@@ -258,11 +258,7 @@ def read_multiple_pdbs(grid_dim, grid_size, center):
             voxel_instance.pdb_to_voxel_atom()
             property_grid = voxel_instance.pdb_to_voxel_property()
             aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
-            projection_sum, property_projection, aa_projection = voxel_instance.project_sum_with_property_and_aa()
 
-            # Use the appropriate function for pdb_to_voxel_atom_with_limited_warnings if it's still needed
-            voxel_grid, atom_info_grid = EmbeddingVoxel.pdb_to_voxel_atom_with_limited_warnings(voxel_instance)
-            
             # Projecting along different axes
             projection_sum_xy, property_projection_xy, aa_projection_xy = voxel_instance.project_sum_with_property_and_aa(axis=2)
             projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=0)
