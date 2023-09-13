@@ -266,11 +266,12 @@ def read_multiple_pdbs(grid_dim, grid_size, center):
 
             combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
             # Exiba a imagem combinada
+            save_path = f"./{pdb_filename}_combined_projection.png"
             plt.imshow(combined_image)
-            plt.axis('off')  # Desligue as bordas do eixo
+            plt.axis('off')  # Turn off axis borders
             plt.title('f(x, y, z) = (2x+y, y+2z)')
-            plt.show()
-
+            plt.savefig(save_path, dpi=600)
+            plt.close()
 
 
 
