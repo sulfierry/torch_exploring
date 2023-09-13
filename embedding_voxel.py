@@ -244,12 +244,7 @@ class EmbeddingVoxel:
 
         return combined_image
 
-def read_multiple_pdbs():
-    # Initializing and running
-    grid_dim = [10, 10, 10] # grid dimension in voxel unitis
-    grid_size = 1.0 # Ångström (Å)
-    center = np.array([28.891, -0.798, 65.003]) 
-    file_path = "./3c9t.pdb"
+def read_multiple_pdbs(grid_dim, grid_size, center):
     
    # Loop over all PDB files in the directory
     for pdb_filename in os.listdir("./"):
@@ -317,4 +312,5 @@ if __name__ == "__main__":
     # plt.title('f(x, y, z) = (2x+y, y+2z)')
     # plt.show()
 
-    read_multiple_pdbs()
+    read_multiple_pdbs(grid_dim, grid_size, center)
+
