@@ -305,7 +305,7 @@ if __name__ == "__main__":
     # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
 
     combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
-    
+
     # Exiba a imagem combinada
     # plt.imshow(combined_image)
     # plt.axis('off')  # Desligue as bordas do eixo
@@ -314,3 +314,29 @@ if __name__ == "__main__":
 
     EmbeddingVoxel.read_multiple_pdbs(grid_dim, grid_size, center)
 
+"""
+    ResNet-18: Uma das variantes mais simples da família ResNet, com 18 camadas.
+    VGG-16: Uma das redes VGG mais populares, com 16 camadas ponderadas.
+    ResNet-34: Uma variante da ResNet com 34 camadas.
+    VGG-19: Uma variante mais profunda da VGG, com 19 camadas ponderadas.
+    ResNet-50: Uma ResNet mais profunda com blocos de "bottle-neck", totalizando 50 camadas.
+    DenseNet-121: O número indica a profundidade (neste caso, 121 camadas). A DenseNet tem conexões densas entre as camadas.
+    ResNet-101: Uma variante ainda mais profunda da ResNet, com 101 camadas.
+    ResNet-152: A variante mais profunda comumente usada da ResNet, com 152 camadas.
+    DenseNet-169, DenseNet-201, DenseNet-264: Variantes mais profundas da DenseNet.
+    EfficientNet: Esta arquitetura tem várias variantes (B0 a B7) que são escalonadas em profundidade, largura e resolução. A EfficientNet-B0 é a mais leve, enquanto a B7 é a mais pesada e complexa.
+    Outras arquiteturas como Inception, Xception: Esses modelos têm um design mais complexo em comparação com os tradicionais como VGG e ResNet, e podem se situar em diferentes posições nesta lista, dependendo da variante específica.
+"""
+
+"""
+    Quando se trata de processar imagens RGB ou cores geométricas, a arquitetura específica do modelo geralmente não é o principal fator determinante para o sucesso. Em vez disso, a preparação adequada dos dados e a engenharia de recursos desempenham um papel mais significativo. No entanto, existem algumas considerações a serem feitas:
+
+    Normalização de Cores: Antes de alimentar imagens RGB em redes neurais, é comum normalizar os valores dos pixels. Isso pode ser feito escalando os valores para o intervalo [0, 1] ou usando a média e o desvio padrão das imagens do conjunto de treinamento.
+    Uso de Canais de Cor: Se a cor for uma característica importante para o seu problema, garanta que você esteja usando todos os três canais RGB. Alguns problemas podem se beneficiar da conversão para outros espaços de cores, como HSV ou Lab.
+    Modelos Específicos para Dados Geométricos: Se você estiver lidando com dados que têm uma representação geométrica específica (como malhas 3D ou dados de nuvem de pontos), pode ser benéfico olhar para arquiteturas projetadas especificamente para esse tipo de dado, como PointNet para nuvens de pontos.
+    Arquiteturas de Atenção: Modelos que usam mecanismos de atenção, como as redes Transformer, podem ser benéficos para capturar relações espaciais em imagens geométricas.
+    Aumento de Dados (Data Augmentation): Para imagens RGB, o aumento de dados, como rotações, inversões e ajustes de cor, pode ajudar a melhorar o desempenho do modelo ao torná-lo mais robusto a variações.
+    Redução de Dimensionalidade: Em algumas situações, pode ser útil reduzir a dimensionalidade dos dados de cor usando técnicas como PCA antes de alimentá-los em um modelo.
+    Engenharia de Características Específicas: Dependendo da natureza do problema, pode ser útil criar características específicas com base na cor ou geometria, como histogramas de cor, descritores de textura ou características de forma.
+    Em resumo, embora as arquiteturas padrão (como ResNet, VGG, etc.) sejam adequadas para lidar com imagens RGB, a preparação dos dados e a engenharia de recursos adequadas são essenciais. Se estiver trabalhando com dados geométricos específicos, considere modelos que foram projetados ou adaptados para essa finalidade.
+"""
