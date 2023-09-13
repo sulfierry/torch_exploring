@@ -113,9 +113,11 @@ class EmbeddingVoxel:
         # Eliminando redundância de variáveis
         return self.voxel_grid, atom_info_grid
 
-
     def get_amino_acid_property(self, res_name):
-    
+        """
+        Obtém a propriedade de um aminoácido com base no seu nome.
+        """
+        
         PROPERTIES = {
             'HIDROPHOBIC': ['ALA', 'ILE', 'LEU', 'MET', 'PHE', 'PRO', 'TRP', 'VAL'],
             'POSITIVE': ['ARG', 'HIS', 'LYS'],
@@ -128,20 +130,30 @@ class EmbeddingVoxel:
                 return property
         return None
 
-    def pdb_to_voxel_property(self):
+    def map_amino_acid_properties_to_voxel(self):
+        """
+        Mapeia as propriedades dos aminoácidos para a grade de voxel.
+        """
+        
+        # Inicialize a grade de propriedades
         self.property_grid = np.empty(self.voxel_grid.shape, dtype=object)
 
-        for atom_section in ["chains", "cofactors", "ligands"]:
-            for atom_details in self.parsed_pdb_data[atom_section]:
-                voxel_coord = self.coord_to_voxel(np.array(atom_details["coord"]))
-                if voxel_coord is not None:
-                    aa_property = self.get_amino_acid_property(atom_details['res_name'])
-                    if aa_property:
-                        self.property_grid[tuple(voxel_coord)] = aa_property
-
-        #return property_grid
-
-
+        # Vamos processar apenas as chains para esta funcionalidade, já que ligantes e cofatores 
+        # podem não ter res_names que correspondam aos aminoácidos padrão.
+        for atom_details in self.parsed_pdb_data["chains"]:
+            
+            voxel_coord = self.coord_to_voxel(np.array(atom_details["coord"]))
+            if voxel_coord is not None:
+                
+                # Verifique se o voxel já está ocupado.
+                if self.property_grid[tuple(voxel_coord)]:
+                    print(f"Warning: Voxel at {voxel_coord} is already occupied. Overwriting!")
+                
+                aa_property = self.get_amino_acid_property(atom_details.get('res_name', ''))
+                if aa_property:
+                    self.property_grid[tuple(voxel_coord)] = aa_property
+                else:
+                    print(f"Warning: Amino acid {atom_details.get('res_name', '')} not recognized or it's a non-standard amino acid.")
 
     def pdb_to_voxel_amino_acid(self):
         self.aa_grid = np.empty(self.voxel_grid.shape, dtype=object)
@@ -284,7 +296,7 @@ class EmbeddingVoxel:
                 
                 # Call the methods
                 voxel_instance.pdb_to_voxel_atom()
-                property_grid = voxel_instance.pdb_to_voxel_property()
+                property_grid = voxel_instance.map_amino_acid_properties_to_voxel()
                 aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
 
                 # Projecting along different axes
@@ -315,7 +327,7 @@ if __name__ == "__main__":
     voxel_instance = EmbeddingVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
     voxel_instance.pdb_to_voxel_atom()
 
-    property_grid = voxel_instance.pdb_to_voxel_property()
+    property_grid = voxel_instance.map_amino_acid_properties_to_voxel()
     aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
     projection_sum, property_projection, aa_projection = voxel_instance.project_sum_with_property_and_aa()
 
