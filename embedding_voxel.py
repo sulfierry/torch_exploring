@@ -243,35 +243,37 @@ class EmbeddingVoxel:
         combined_image = np.clip(combined_image, 0, map_color_value).astype(np.uint8)
 
         return combined_image
-
-def read_multiple_pdbs(grid_dim, grid_size, center):
     
-   # Loop over all PDB files in the directory
-    for pdb_filename in os.listdir("./"):
-        if pdb_filename.endswith(".pdb"):
-            file_path = os.path.join("./", pdb_filename)
-            
-            # Create an instance of the EmbeddingVoxel class
-            voxel_instance = EmbeddingVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
-            
-            # Call the methods
-            voxel_instance.pdb_to_voxel_atom()
-            property_grid = voxel_instance.pdb_to_voxel_property()
-            aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
+    @staticmethod
+    def read_multiple_pdbs(grid_dim, grid_size, center):
+        
+    # Loop over all PDB files in the directory
+        for pdb_filename in os.listdir("./"):
+            if pdb_filename.endswith(".pdb"):
+                file_path = os.path.join("./", pdb_filename)
+                
+                # Create an instance of the EmbeddingVoxel class
+                voxel_instance = EmbeddingVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
+                
+                # Call the methods
+                voxel_instance.pdb_to_voxel_atom()
+                property_grid = voxel_instance.pdb_to_voxel_property()
+                aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
 
-            # Projecting along different axes
-            projection_sum_xy, property_projection_xy, aa_projection_xy = voxel_instance.project_sum_with_property_and_aa(axis=2)
-            projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=0)
-            projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=1)
+                # Projecting along different axes
+                projection_sum_xy, property_projection_xy, aa_projection_xy = voxel_instance.project_sum_with_property_and_aa(axis=2)
+                projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=0)
+                projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=1)
 
-            combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
-            # Exiba a imagem combinada
-            save_path = f"./{pdb_filename}_combined_projection.png"
-            plt.imshow(combined_image)
-            plt.axis('off')  # Turn off axis borders
-            plt.title('f(x, y, z) = (2x+y, y+2z)')
-            plt.savefig(save_path, dpi=600)
-            plt.close()
+                combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
+                # Exiba a imagem combinada
+                save_path = f"./{pdb_filename}_combined_projection.png"
+                plt.imshow(combined_image)
+                plt.axis('off')  # Turn off axis borders
+                # plt.title('f(x, y, z) = (2x+y, y+2z)')
+                plt.savefig(save_path, dpi=600)
+                # plt.show()
+                plt.close()
 
 
 
@@ -303,11 +305,12 @@ if __name__ == "__main__":
     # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
 
     combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
+    
     # Exiba a imagem combinada
     # plt.imshow(combined_image)
     # plt.axis('off')  # Desligue as bordas do eixo
     # plt.title('f(x, y, z) = (2x+y, y+2z)')
     # plt.show()
 
-    read_multiple_pdbs(grid_dim, grid_size, center)
+    EmbeddingVoxel.read_multiple_pdbs(grid_dim, grid_size, center)
 
