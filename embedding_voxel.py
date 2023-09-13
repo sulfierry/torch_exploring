@@ -18,6 +18,7 @@ class EmbeddingVoxel:
         self.aa_grid = None
 
     def plot_voxel(self):
+        """Plota o voxel em uma grid 3D."""
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         
@@ -36,6 +37,7 @@ class EmbeddingVoxel:
         plt.show()
 
     def parse_pdb(self, pdb_file_path):
+        """Converte o PDB para a estrutura de dados dicionario."""
         with open(pdb_file_path, 'r') as file:
             pdb_data = file.readlines()
         
@@ -156,22 +158,36 @@ class EmbeddingVoxel:
                     print(f"Warning: Amino acid {atom_details.get('res_name', '')} not recognized or it's a non-standard amino acid.")
 
     def pdb_to_voxel_amino_acid(self):
+        """
+        Converte a informação PDB para uma grade de voxel que representa o nome do aminoácido.
+        """
+        # Inicializando a grid de aminoácidos
         self.aa_grid = np.empty(self.voxel_grid.shape, dtype=object)
+
+        # Iterando sobre as seções do PDB
         for atom_section in ["chains", "cofactors", "ligands"]:
             for atom_details in self.parsed_pdb_data[atom_section]:
                 voxel_coord = self.coord_to_voxel(np.array(atom_details["coord"]))
                 if voxel_coord is not None:
+                    # Verifica se o voxel já está ocupado
+                    if self.aa_grid[tuple(voxel_coord)]:
+                        print(f"Warning: Voxel at {voxel_coord} is already occupied. Overwriting!")
                     self.aa_grid[tuple(voxel_coord)] = atom_details['res_name']
-
-
-        #return aa_grid
+        return self.aa_grid
 
     def project_sum_with_property_and_aa(self, axis=2):
+        # Calculate the sum of the voxel grid along the specified axis.
         projection_sum = np.sum(self.voxel_grid, axis=axis)
-        property_projection = np.empty(projection_sum.shape, dtype=object)
-        aa_projection = np.empty(projection_sum.shape, dtype=object)
+
+        # Create empty dictionaries to store the projected property and AA values.
+        property_projection = {}
+        aa_projection = {}
+
+        # Iterate over each row and column in the projection.
         for x in range(projection_sum.shape[0]):
             for y in range(projection_sum.shape[1]):
+
+                # Check the corresponding column in the voxel grid, property grid, and AA grid.
                 if axis == 0:
                     properties_in_column = self.property_grid[x, y, :]
                     aas_in_column = self.aa_grid[x, y, :]
@@ -182,22 +198,20 @@ class EmbeddingVoxel:
                     properties_in_column = self.property_grid[:, x, y]
                     aas_in_column = self.aa_grid[:, x, y]
 
+                # If the column is not empty, calculate the predominant property and AA in the column and store them in the corresponding dictionaries.
                 properties_in_column = [prop for prop in properties_in_column if prop]
                 aas_in_column = [aa for aa in aas_in_column if aa]
 
                 if properties_in_column:
-                    unique, counts = np.unique(properties_in_column, return_counts=True)
-                    predominant_property = unique[np.argmax(counts)]
+                    predominant_property = properties_in_column[0]
                     property_projection[x, y] = predominant_property
 
                 if aas_in_column:
-                    unique, counts = np.unique(aas_in_column, return_counts=True)
-                    predominant_aa = unique[np.argmax(counts)]
+                    predominant_aa = aas_in_column[0]
                     aa_projection[x, y] = predominant_aa
 
+        # Return the projection sum, projected property, and projected AA arrays.
         return projection_sum, property_projection, aa_projection
-
-
 
     @staticmethod
     def pdb_to_voxel_atom_with_limited_warnings(voxel_instance):
