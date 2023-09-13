@@ -265,27 +265,41 @@ class EmbeddingVoxel:
         
     @staticmethod
     def combine_projections(projection_xz, projection_yz, projection_xy):
-
+        """
+        Combina três projeções em um único mapa de cores RGB e normaliza o resultado.
+        
+        :param projection_xz: Array 2D representando a projeção XZ.
+        :param projection_yz: Array 2D representando a projeção YZ.
+        :param projection_xy: Array 2D representando a projeção XY.
+        :return: Imagem RGB combinada e normalizada.
+        """
+        
+        # Validação de entrada: Garantir que as projeções tenham as mesmas dimensões
+        assert projection_xz.shape == projection_yz.shape == projection_xy.shape, "Projections must have the same shape"
+        
         map_color_value = 255
-        # Redimensione as projeções para terem a mesma forma
         height, width = projection_xz.shape
-        projection_xz_color = np.zeros((height, width, 3), dtype=np.uint8)
-        projection_yz_color = np.zeros((height, width, 3), dtype=np.uint8)
-        projection_xy_color = np.zeros((height, width, 3), dtype=np.uint8)
+        
+        # Inicializar imagens coloridas com zeros
+        projection_xz_color = np.zeros((height, width, 3), dtype=np.float32)  # Usar float32 para evitar overflow antes da normalização
+        projection_yz_color = np.zeros((height, width, 3), dtype=np.float32)
+        projection_xy_color = np.zeros((height, width, 3), dtype=np.float32)
 
-        # Aplique mapeamento de cores às projeções
-        projection_xz_color[:, :, 0] = (projection_xz * map_color_value).astype(np.uint8)
-        projection_yz_color[:, :, 1] = (projection_yz * map_color_value).astype(np.uint8)
-        projection_xy_color[:, :, 2] = (projection_xy * map_color_value).astype(np.uint8)
+        # Mapear projeções para seus respectivos canais de cores
+        projection_xz_color[:, :, 0] = projection_xz * map_color_value
+        projection_yz_color[:, :, 1] = projection_yz * map_color_value
+        projection_xy_color[:, :, 2] = projection_xy * map_color_value
 
-        # Combine as projeções coloridas
+        # Combinação de imagens coloridas
         combined_image = projection_xz_color + projection_yz_color + projection_xy_color
 
-        # Certifique-se de que os valores não ultrapassem 255
-        combined_image = np.clip(combined_image, 0, map_color_value).astype(np.uint8)
+        # Normalização usando Min-Max scaling
+        min_pixel = combined_image.min()
+        max_pixel = combined_image.max()
+        normalized_image = ((combined_image - min_pixel) / (max_pixel - min_pixel) * map_color_value).astype(np.uint8)
 
-        return combined_image
-    
+        return normalized_image
+
     @staticmethod
     def read_multiple_pdbs(grid_dim, grid_size, center):
         
@@ -368,17 +382,4 @@ if __name__ == "__main__":
     DenseNet-169, DenseNet-201, DenseNet-264: Variantes mais profundas da DenseNet.
     EfficientNet: Esta arquitetura tem várias variantes (B0 a B7) que são escalonadas em profundidade, largura e resolução. A EfficientNet-B0 é a mais leve, enquanto a B7 é a mais pesada e complexa.
     Outras arquiteturas como Inception, Xception: Esses modelos têm um design mais complexo em comparação com os tradicionais como VGG e ResNet, e podem se situar em diferentes posições nesta lista, dependendo da variante específica.
-"""
-
-"""
-    Quando se trata de processar imagens RGB ou cores geométricas, a arquitetura específica do modelo geralmente não é o principal fator determinante para o sucesso. Em vez disso, a preparação adequada dos dados e a engenharia de recursos desempenham um papel mais significativo. No entanto, existem algumas considerações a serem feitas:
-
-    Normalização de Cores: Antes de alimentar imagens RGB em redes neurais, é comum normalizar os valores dos pixels. Isso pode ser feito escalando os valores para o intervalo [0, 1] ou usando a média e o desvio padrão das imagens do conjunto de treinamento.
-    Uso de Canais de Cor: Se a cor for uma característica importante para o seu problema, garanta que você esteja usando todos os três canais RGB. Alguns problemas podem se beneficiar da conversão para outros espaços de cores, como HSV ou Lab.
-    Modelos Específicos para Dados Geométricos: Se você estiver lidando com dados que têm uma representação geométrica específica (como malhas 3D ou dados de nuvem de pontos), pode ser benéfico olhar para arquiteturas projetadas especificamente para esse tipo de dado, como PointNet para nuvens de pontos.
-    Arquiteturas de Atenção: Modelos que usam mecanismos de atenção, como as redes Transformer, podem ser benéficos para capturar relações espaciais em imagens geométricas.
-    Aumento de Dados (Data Augmentation): Para imagens RGB, o aumento de dados, como rotações, inversões e ajustes de cor, pode ajudar a melhorar o desempenho do modelo ao torná-lo mais robusto a variações.
-    Redução de Dimensionalidade: Em algumas situações, pode ser útil reduzir a dimensionalidade dos dados de cor usando técnicas como PCA antes de alimentá-los em um modelo.
-    Engenharia de Características Específicas: Dependendo da natureza do problema, pode ser útil criar características específicas com base na cor ou geometria, como histogramas de cor, descritores de textura ou características de forma.
-    Em resumo, embora as arquiteturas padrão (como ResNet, VGG, etc.) sejam adequadas para lidar com imagens RGB, a preparação dos dados e a engenharia de recursos adequadas são essenciais. Se estiver trabalhando com dados geométricos específicos, considere modelos que foram projetados ou adaptados para essa finalidade.
 """
