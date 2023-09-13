@@ -31,6 +31,7 @@ class PDBVoxel:
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
+        plt.title('Voxel grid')
         plt.show()
 
     def parse_pdb(self, pdb_file_path):
@@ -221,6 +222,8 @@ class PDBVoxel:
 
     @staticmethod
     def combine_projections(projection_xz, projection_yz, projection_xy):
+
+        map_color_value = 255
         # Redimensione as projeções para terem a mesma forma
         height, width = projection_xz.shape
         projection_xz_color = np.zeros((height, width, 3), dtype=np.uint8)
@@ -228,15 +231,15 @@ class PDBVoxel:
         projection_xy_color = np.zeros((height, width, 3), dtype=np.uint8)
 
         # Aplique mapeamento de cores às projeções
-        projection_xz_color[:, :, 0] = (projection_xz * 255).astype(np.uint8)
-        projection_yz_color[:, :, 1] = (projection_yz * 255).astype(np.uint8)
-        projection_xy_color[:, :, 2] = (projection_xy * 255).astype(np.uint8)
+        projection_xz_color[:, :, 0] = (projection_xz * map_color_value).astype(np.uint8)
+        projection_yz_color[:, :, 1] = (projection_yz * map_color_value).astype(np.uint8)
+        projection_xy_color[:, :, 2] = (projection_xy * map_color_value).astype(np.uint8)
 
         # Combine as projeções coloridas
         combined_image = projection_xz_color + projection_yz_color + projection_xy_color
 
         # Certifique-se de que os valores não ultrapassem 255
-        combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
+        combined_image = np.clip(combined_image, 0, map_color_value).astype(np.uint8)
 
         return combined_image
 
@@ -245,16 +248,14 @@ class PDBVoxel:
 if __name__ == "__main__":
 
     # Initializing and running
-    grid_dim = [15, 15, 15] # grid dimension in voxel unitis
-    grid_size = 1.0 # agstroms
-    center = np.array([17.773, 63.285, 121.743]) 
+    grid_dim = [10, 10, 10] # grid dimension in voxel unitis
+    grid_size = 1.0 # Ångström (Å)
+    center = np.array([28.891, -0.798, 65.003]) 
     file_path = "./3c9t.pdb"
 
     voxel_instance = PDBVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
-    # parsed_pdb = voxel_instance.parse_pdb(file_path)
     voxel_instance.pdb_to_voxel_atom()
 
-    # Call the methods directly from the voxel_instance
     property_grid = voxel_instance.pdb_to_voxel_property()
     aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
     projection_sum, property_projection, aa_projection = voxel_instance.project_sum_with_property_and_aa()
@@ -262,22 +263,16 @@ if __name__ == "__main__":
     # Use the appropriate function for pdb_to_voxel_atom_with_limited_warnings if it's still needed
     voxel_grid, atom_info_grid = PDBVoxel.pdb_to_voxel_atom_with_limited_warnings(voxel_instance)
     
-    voxel_instance.plot_voxel()
-
-    # Para projeção X, Y
-    projection_sum_xy, property_projection_xy, aa_projection_xy = voxel_instance.project_sum_with_property_and_aa(axis=2)
-    PDBVoxel.plot_projection_with_corrected_representation(projection_sum_xy, aa_projection_xy, property_projection_xy, atom_info_grid, title="Projection (x,y)")
-
-    # Para projeção X, Z
-    projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=1)
-    PDBVoxel.plot_projection_with_corrected_representation(projection_sum_xz, aa_projection_xz, property_projection_xz, atom_info_grid, title="Projection (x,z)")
-
-    # Para projeção Y, Z
-    projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=0)
-    PDBVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
+    projection_sum_xy, property_projection_xy, aa_projection_xy = voxel_instance.project_sum_with_property_and_aa(axis=2)  # Para projeção X, Y
+    projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=1)  # Para projeção X, Z
+    projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=0)  # Para projeção Y, Z
+    
+    # voxel_instance.plot_voxel()
+    # PDBVoxel.plot_projection_with_corrected_representation(projection_sum_xy, aa_projection_xy, property_projection_xy, atom_info_grid, title="Projection (x,y)")
+    # PDBVoxel.plot_projection_with_corrected_representation(projection_sum_xz, aa_projection_xz, property_projection_xz, atom_info_grid, title="Projection (x,z)")
+    # PDBVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
 
     combined_image = PDBVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
-
     # Exiba a imagem combinada
     plt.imshow(combined_image)
     plt.axis('off')  # Desligue as bordas do eixo
