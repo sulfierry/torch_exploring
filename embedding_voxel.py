@@ -301,37 +301,50 @@ class EmbeddingVoxel:
         return normalized_image
 
     @staticmethod
-    def read_multiple_pdbs(grid_dim, grid_size, center):
+    def read_multiple_pdbs(directory_path, grid_dim, grid_size, center):
+        """Ler e processar múltiplos arquivos PDB em um diretório."""
         
-    # Loop over all PDB files in the directory
-        for pdb_filename in os.listdir("./"):
+        # Verificar a existência do diretório
+        if not os.path.exists(directory_path):
+            print(f"Diretório {directory_path} não encontrado!")
+            return
+        
+        # Loop over all PDB files in the directory
+        for pdb_filename in os.listdir(directory_path):
             if pdb_filename.endswith(".pdb"):
-                file_path = os.path.join("./", pdb_filename)
+                file_path = os.path.join(directory_path, pdb_filename)
                 
-                # Create an instance of the EmbeddingVoxel class
-                voxel_instance = EmbeddingVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
+                combined_image = EmbeddingVoxel.process_pdb(file_path, grid_dim, grid_size, center)
                 
-                # Call the methods
-                voxel_instance.pdb_to_voxel_atom()
-                property_grid = voxel_instance.map_amino_acid_properties_to_voxel()
-                aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
+                if combined_image is not None:
+                    # Exibir e salvar a imagem combinada
+                    save_path = os.path.join(directory_path, f"{pdb_filename}_combined_projection.png")
+                    plt.imshow(combined_image)
+                    plt.axis('off')  # Desativar as bordas do eixo
+                    plt.savefig(save_path, dpi=600)
+                    plt.show()
+                    plt.close()
+                    
+                print(f"Processado {pdb_filename}")
 
-                # Projecting along different axes
-                projection_sum_xy, property_projection_xy, aa_projection_xy = voxel_instance.project_sum_with_property_and_aa(axis=2)
-                projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=0)
-                projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=1)
+    @staticmethod
+    def process_pdb(file_path, grid_dim, grid_size, center):
+        # Criação de uma instância da classe
+        voxel_instance = EmbeddingVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
+        
+        # Chamar os métodos necessários
+        voxel_instance.pdb_to_voxel_atom()
+        property_grid = voxel_instance.map_amino_acid_properties_to_voxel()
+        aa_grid = voxel_instance.pdb_to_voxel_amino_acid()
 
-                combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
-                # Exiba a imagem combinada
-                save_path = f"./{pdb_filename}_combined_projection.png"
-                plt.imshow(combined_image)
-                plt.axis('off')  # Turn off axis borders
-                # plt.title('f(x, y, z) = (2x+y, y+2z)')
-                plt.savefig(save_path, dpi=600)
-                plt.show()
-                plt.close()
+        # Projeções
+        projection_sum_xy, property_projection_xy, aa_projection_xy = voxel_instance.project_sum_with_property_and_aa(axis=2)
+        projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=0)
+        projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=1)
 
+        combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
 
+        return combined_image
 
 if __name__ == "__main__":
 
@@ -340,6 +353,7 @@ if __name__ == "__main__":
     grid_size = 1.0 # Ångström (Å)
     center = np.array([28.891, -0.798, 65.003]) 
     file_path = "./3c9t.pdb"
+    directory_path = './'
     
     voxel_instance = EmbeddingVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
     voxel_instance.pdb_to_voxel_atom()
@@ -365,10 +379,10 @@ if __name__ == "__main__":
     # Exiba a imagem combinada
     plt.imshow(combined_image)
     plt.axis('off')  # Desligue as bordas do eixo
-    plt.title('f(x, y, z) = (2x+y, y+2z)')
-    plt.show()
+    #plt.title('f(x, y, z) = (2x+y, y+2z)')
+    #plt.show()
 
-    # EmbeddingVoxel.read_multiple_pdbs(grid_dim, grid_size, center)
+    EmbeddingVoxel.read_multiple_pdbs(directory_path, grid_dim, grid_size, center)
 
 """
     ResNet-18: Uma das variantes mais simples da família ResNet, com 18 camadas.
