@@ -215,25 +215,19 @@ class EmbeddingVoxel:
 
     @staticmethod
     def pdb_to_voxel_atom_with_limited_warnings(voxel_instance):
-        
+
         parsed_pdb = voxel_instance.parsed_pdb_data
         global warnings_count
-        warnings_limit = 5
         warnings_count = 0
         atom_info_grid = np.empty(voxel_instance.voxel_grid.shape, dtype=object)
         for atom_section in ["chains", "cofactors", "ligands"]:
             for atom_details in parsed_pdb[atom_section]:
                 voxel_coord = voxel_instance.coord_to_voxel(np.array(atom_details["coord"]))
-                if voxel_coord is None:
-                    if warnings_count < warnings_limit:
-                        print(f"Invalid voxel coordinates for atom coordinate: {atom_details['coord']}")
-                        warnings_count += 1
-                else:
+                if voxel_coord is not None:
                     voxel_instance.voxel_grid[tuple(voxel_coord)] = 1
                     atom_info_grid[tuple(voxel_coord)] = atom_details
-        if warnings_count == warnings_limit:
-            print("... More invalid voxel coordinates found. Limiting output ...")
         return voxel_instance.voxel_grid, atom_info_grid
+
 
     @staticmethod
     def plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid, title="Projection"):
@@ -246,34 +240,29 @@ class EmbeddingVoxel:
         }
 
         fig, ax = plt.subplots(figsize=(8, 8))
-        colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
+        colored_projection = np.zeros(projection_sum.shape + (3,))
 
         for x in range(projection_sum.shape[0]):
             for y in range(projection_sum.shape[1]):
                 atom_count = projection_sum[x, y]
                 if aa_projection[x, y] and atom_count > 0:
                     color = matplotlib.colors.hex2color(COLOR_PALETTE[property_projection[x, y]])
-                    min_intensity = 0.3
-                    range_intensity = 0.7  # 1 - min_intensity
-                    intensity = min_intensity + range_intensity * (atom_count / (projection_sum.max() + 0.5))
-                    colored_projection[x, y] = [c * intensity for c in color]
+                    colored_projection[x, y] = color
 
                     # Collecting atom names for the current cell
                     atoms_in_column = atom_info_grid[x, y, :]
                     atom_names = [atom["element"] for atom in atoms_in_column if atom]
-                    unique_atoms, atom_counts = np.unique(atom_names, return_counts=True)
-                    atom_string = ", ".join([f"{atom}{count}" for atom, count in zip(unique_atoms, atom_counts)])
 
-                    label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_string}"
+                    label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_names}"
                     ax.text(y, x, label, ha='center', va='center', color='white', fontsize=6)
                     rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
                     ax.add_patch(rect)
 
         ax.imshow(colored_projection, origin='upper')
-        ax.set_title(title)  # Aqui você pode definir o título passando o argumento 'title'
+        ax.set_title(title)
         plt.tight_layout()
         plt.show()
-
+        
     @staticmethod
     def combine_projections(projection_xz, projection_yz, projection_xy):
 
