@@ -67,23 +67,50 @@ class EmbeddingVoxel:
         return parsed_data
     
     def coord_to_voxel(self, coord):
+        """
+        Converta coordenadas atômicas 3D do PDB em coordenadas de voxel na grade.
+        
+        Parameters:
+        - coord: Coordenadas 3D do átomo (do PDB).
+
+        Returns:
+        - voxel_coord: Coordenadas correspondentes na grade de voxel ou None se estiver fora da grade.
+        """
+        
         voxel_coord = np.floor((coord - self.center) / self.grid_size).astype(int)
-        if np.any(voxel_coord < 0) or np.any(voxel_coord >= self.voxel_grid.shape):
+        
+        # Corrigindo a validação
+        if np.any(voxel_coord < 0) or np.any(voxel_coord >= np.array(self.voxel_grid.shape)):
             print(f"Invalid voxel coordinates: {voxel_coord} for atom coordinate: {coord}")
             return None
         return voxel_coord
-    
+
     def pdb_to_voxel_atom(self):
+        """
+        Mapeia átomos do PDB na grade de voxel.
+        Este método processa diferentes seções do PDB: cadeias, cofatores e ligantes.
+        
+        Returns:
+        - self.voxel_grid: Uma grade 3D onde 1 indica a presença de um átomo e 0 indica vazio.
+        - atom_info_grid: Uma grade 3D armazenando os detalhes do átomo correspondente ao voxel.
+        """
+        
+        # Inicializando com dtype=object para flexibilidade, mas pode ser menos eficiente
         atom_info_grid = np.empty(self.voxel_grid.shape, dtype=object)
         
         for atom_section in ["chains", "cofactors", "ligands"]:
-            for atom_details in self.parsed_pdb_data[atom_section]:  # Aqui foi feita a correção
+            for atom_details in self.parsed_pdb_data[atom_section]:
                 voxel_coord = self.coord_to_voxel(np.array(atom_details["coord"]))
+                
                 if voxel_coord is not None:
+                    # Registro de ocupação
+                    if self.voxel_grid[tuple(voxel_coord)] == 1:
+                        print(f"Warning: Voxel at {voxel_coord} is already occupied. Overwriting!")
+                    
                     self.voxel_grid[tuple(voxel_coord)] = 1
                     atom_info_grid[tuple(voxel_coord)] = atom_details
 
-        self.voxel = self.voxel_grid  # Update the voxel attribute
+        # Eliminando redundância de variáveis
         return self.voxel_grid, atom_info_grid
 
 
@@ -272,7 +299,7 @@ class EmbeddingVoxel:
                 plt.axis('off')  # Turn off axis borders
                 # plt.title('f(x, y, z) = (2x+y, y+2z)')
                 plt.savefig(save_path, dpi=600)
-                # plt.show()
+                plt.show()
                 plt.close()
 
 
@@ -307,12 +334,12 @@ if __name__ == "__main__":
     combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
 
     # Exiba a imagem combinada
-    # plt.imshow(combined_image)
-    # plt.axis('off')  # Desligue as bordas do eixo
-    # plt.title('f(x, y, z) = (2x+y, y+2z)')
-    # plt.show()
+    plt.imshow(combined_image)
+    plt.axis('off')  # Desligue as bordas do eixo
+    plt.title('f(x, y, z) = (2x+y, y+2z)')
+    plt.show()
 
-    EmbeddingVoxel.read_multiple_pdbs(grid_dim, grid_size, center)
+    # EmbeddingVoxel.read_multiple_pdbs(grid_dim, grid_size, center)
 
 """
     ResNet-18: Uma das variantes mais simples da família ResNet, com 18 camadas.
