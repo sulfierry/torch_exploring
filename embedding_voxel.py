@@ -306,15 +306,15 @@ if __name__ == "__main__":
     projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=0)  # Para projeção Y, Z
     
     # voxel_instance.plot_voxel()
-    EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_xy, aa_projection_xy, property_projection_xy, atom_info_grid, title="Projection (x,y)")
-    EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_xz, aa_projection_xz, property_projection_xz, atom_info_grid, title="Projection (x,z)")
-    EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
+    # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_xy, aa_projection_xy, property_projection_xy, atom_info_grid, title="Projection (x,y)")
+    # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_xz, aa_projection_xz, property_projection_xz, atom_info_grid, title="Projection (x,z)")
+    # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
 
     combined_image = EmbeddingVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
     # Exiba a imagem combinada
-    plt.imshow(combined_image)
-    plt.axis('off')  # Desligue as bordas do eixo
-    plt.title('f(x, y, z) = (2x+y, y+2z)')
-    plt.show()
+    # plt.imshow(combined_image)
+    # plt.axis('off')  # Desligue as bordas do eixo
+    # plt.title('f(x, y, z) = (2x+y, y+2z)')
+    # plt.show()
 
-    #read_multiple_pdbs()
+    read_multiple_pdbs()
