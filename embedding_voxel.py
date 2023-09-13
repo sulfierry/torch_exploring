@@ -18,7 +18,6 @@ class EmbeddingVoxel:
         self.aa_grid = None
 
     def plot_voxel(self):
-        """Plota o voxel em uma grid 3D."""
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         
@@ -37,7 +36,6 @@ class EmbeddingVoxel:
         plt.show()
 
     def parse_pdb(self, pdb_file_path):
-        """Converte o PDB para a estrutura de dados dicionario."""
         with open(pdb_file_path, 'r') as file:
             pdb_data = file.readlines()
         
@@ -86,33 +84,18 @@ class EmbeddingVoxel:
             print(f"Invalid voxel coordinates: {voxel_coord} for atom coordinate: {coord}")
             return None
         return voxel_coord
-
+    
     def pdb_to_voxel_atom(self):
-        """
-        Mapeia átomos do PDB na grade de voxel.
-        Este método processa diferentes seções do PDB: cadeias, cofatores e ligantes.
-        
-        Returns:
-        - self.voxel_grid: Uma grade 3D onde 1 indica a presença de um átomo e 0 indica vazio.
-        - atom_info_grid: Uma grade 3D armazenando os detalhes do átomo correspondente ao voxel.
-        """
-        
-        # Inicializando com dtype=object para flexibilidade, mas pode ser menos eficiente
         atom_info_grid = np.empty(self.voxel_grid.shape, dtype=object)
         
         for atom_section in ["chains", "cofactors", "ligands"]:
-            for atom_details in self.parsed_pdb_data[atom_section]:
+            for atom_details in self.parsed_pdb_data[atom_section]:  # Aqui foi feita a correção
                 voxel_coord = self.coord_to_voxel(np.array(atom_details["coord"]))
-                
                 if voxel_coord is not None:
-                    # Registro de ocupação
-                    if self.voxel_grid[tuple(voxel_coord)] == 1:
-                        print(f"Warning: Voxel at {voxel_coord} is already occupied. Overwriting!")
-                    
                     self.voxel_grid[tuple(voxel_coord)] = 1
                     atom_info_grid[tuple(voxel_coord)] = atom_details
 
-        # Eliminando redundância de variáveis
+        self.voxel = self.voxel_grid  # Update the voxel attribute
         return self.voxel_grid, atom_info_grid
 
     def get_amino_acid_property(self, res_name):
@@ -157,6 +140,8 @@ class EmbeddingVoxel:
                 else:
                     print(f"Warning: Amino acid {atom_details.get('res_name', '')} not recognized or it's a non-standard amino acid.")
 
+
+
     def pdb_to_voxel_amino_acid(self):
         """
         Converte a informação PDB para uma grade de voxel que representa o nome do aminoácido.
@@ -175,43 +160,50 @@ class EmbeddingVoxel:
                     self.aa_grid[tuple(voxel_coord)] = atom_details['res_name']
         return self.aa_grid
 
+
+    # MELHORAR
     def project_sum_with_property_and_aa(self, axis=2):
-        # Calculate the sum of the voxel grid along the specified axis.
+        # Projeção simples com base na soma
         projection_sum = np.sum(self.voxel_grid, axis=axis)
 
-        # Create empty dictionaries to store the projected property and AA values.
-        property_projection = {}
-        aa_projection = {}
+        # Inicializa projeções vazias
+        property_projection = np.empty(projection_sum.shape, dtype=object)
+        aa_projection = np.empty(projection_sum.shape, dtype=object)
 
-        # Iterate over each row and column in the projection.
+        # Definindo uma função auxiliar para obter as colunas corretas com base no eixo
+        def get_column(axis, x, y):
+            if axis == 0:
+                return (x, y, slice(None))
+            elif axis == 1:
+                return (x, slice(None), y)
+            else:
+                return (slice(None), x, y)
+
         for x in range(projection_sum.shape[0]):
             for y in range(projection_sum.shape[1]):
+                slice_tuple = get_column(axis, x, y)
 
-                # Check the corresponding column in the voxel grid, property grid, and AA grid.
-                if axis == 0:
-                    properties_in_column = self.property_grid[x, y, :]
-                    aas_in_column = self.aa_grid[x, y, :]
-                elif axis == 1:
-                    properties_in_column = self.property_grid[x, :, y]
-                    aas_in_column = self.aa_grid[x, :, y]
-                else:
-                    properties_in_column = self.property_grid[:, x, y]
-                    aas_in_column = self.aa_grid[:, x, y]
+                properties_in_column = self.property_grid[slice_tuple]
+                aas_in_column = self.aa_grid[slice_tuple]
 
-                # If the column is not empty, calculate the predominant property and AA in the column and store them in the corresponding dictionaries.
-                properties_in_column = [prop for prop in properties_in_column if prop]
-                aas_in_column = [aa for aa in aas_in_column if aa]
+                # Filtrando valores não nulos com numpy diretamente
+                valid_props = properties_in_column[properties_in_column != None]
+                valid_aas = aas_in_column[aas_in_column != None]
 
-                if properties_in_column:
-                    predominant_property = properties_in_column[0]
+                if valid_props.size:
+                    unique, counts = np.unique(valid_props, return_counts=True)
+                    predominant_property = unique[np.argmax(counts)]
                     property_projection[x, y] = predominant_property
 
-                if aas_in_column:
-                    predominant_aa = aas_in_column[0]
+                if valid_aas.size:
+                    unique, counts = np.unique(valid_aas, return_counts=True)
+                    predominant_aa = unique[np.argmax(counts)]
                     aa_projection[x, y] = predominant_aa
 
-        # Return the projection sum, projected property, and projected AA arrays.
         return projection_sum, property_projection, aa_projection
+
+
+
 
     @staticmethod
     def pdb_to_voxel_atom_with_limited_warnings(voxel_instance):
@@ -228,7 +220,7 @@ class EmbeddingVoxel:
                     atom_info_grid[tuple(voxel_coord)] = atom_details
         return voxel_instance.voxel_grid, atom_info_grid
 
-
+    # MELHORAR
     @staticmethod
     def plot_projection_with_corrected_representation(projection_sum, aa_projection, property_projection, atom_info_grid, title="Projection"):
 
@@ -240,29 +232,34 @@ class EmbeddingVoxel:
         }
 
         fig, ax = plt.subplots(figsize=(8, 8))
-        colored_projection = np.zeros(projection_sum.shape + (3,))
+        colored_projection = np.zeros(projection_sum.shape + (3,)) + 1  # initialize with white color
 
         for x in range(projection_sum.shape[0]):
             for y in range(projection_sum.shape[1]):
                 atom_count = projection_sum[x, y]
                 if aa_projection[x, y] and atom_count > 0:
                     color = matplotlib.colors.hex2color(COLOR_PALETTE[property_projection[x, y]])
-                    colored_projection[x, y] = color
+                    min_intensity = 0.3
+                    range_intensity = 0.7  # 1 - min_intensity
+                    intensity = min_intensity + range_intensity * (atom_count / (projection_sum.max() + 0.5))
+                    colored_projection[x, y] = [c * intensity for c in color]
 
                     # Collecting atom names for the current cell
                     atoms_in_column = atom_info_grid[x, y, :]
                     atom_names = [atom["element"] for atom in atoms_in_column if atom]
+                    unique_atoms, atom_counts = np.unique(atom_names, return_counts=True)
+                    atom_string = ", ".join([f"{atom}{count}" for atom, count in zip(unique_atoms, atom_counts)])
 
-                    label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_names}"
+                    label = f"{aa_projection[x, y]}\n{atom_count}\n{atom_string}"
                     ax.text(y, x, label, ha='center', va='center', color='white', fontsize=6)
                     rect = patches.Rectangle((y-0.5, x-0.5), 1, 1, linewidth=1, edgecolor='black', facecolor='none')
                     ax.add_patch(rect)
 
         ax.imshow(colored_projection, origin='upper')
-        ax.set_title(title)
+        ax.set_title(title)  # Aqui você pode definir o título passando o argumento 'title'
         plt.tight_layout()
         plt.show()
-        
+
     @staticmethod
     def combine_projections(projection_xz, projection_yz, projection_xy):
         """
@@ -299,7 +296,7 @@ class EmbeddingVoxel:
         normalized_image = ((combined_image - min_pixel) / (max_pixel - min_pixel) * map_color_value).astype(np.uint8)
 
         return normalized_image
-
+    
     @staticmethod
     def read_multiple_pdbs(directory_path, grid_dim, grid_size, center):
         """Ler e processar múltiplos arquivos PDB em um diretório."""
@@ -353,7 +350,7 @@ if __name__ == "__main__":
     grid_size = 1.0 # Ångström (Å)
     center = np.array([28.891, -0.798, 65.003]) 
     file_path = "./3c9t.pdb"
-    directory_path = './'
+    directory_path = "./"
     
     voxel_instance = EmbeddingVoxel(None, np.zeros(grid_dim), None, center, grid_size, file_path)
     voxel_instance.pdb_to_voxel_atom()
@@ -379,8 +376,7 @@ if __name__ == "__main__":
     # Exiba a imagem combinada
     plt.imshow(combined_image)
     plt.axis('off')  # Desligue as bordas do eixo
-    #plt.title('f(x, y, z) = (2x+y, y+2z)')
-    #plt.show()
+    # plt.show()
 
     EmbeddingVoxel.read_multiple_pdbs(directory_path, grid_dim, grid_size, center)
 
@@ -396,4 +392,17 @@ if __name__ == "__main__":
     DenseNet-169, DenseNet-201, DenseNet-264: Variantes mais profundas da DenseNet.
     EfficientNet: Esta arquitetura tem várias variantes (B0 a B7) que são escalonadas em profundidade, largura e resolução. A EfficientNet-B0 é a mais leve, enquanto a B7 é a mais pesada e complexa.
     Outras arquiteturas como Inception, Xception: Esses modelos têm um design mais complexo em comparação com os tradicionais como VGG e ResNet, e podem se situar em diferentes posições nesta lista, dependendo da variante específica.
+"""
+
+"""
+    Quando se trata de processar imagens RGB ou cores geométricas, a arquitetura específica do modelo geralmente não é o principal fator determinante para o sucesso. Em vez disso, a preparação adequada dos dados e a engenharia de recursos desempenham um papel mais significativo. No entanto, existem algumas considerações a serem feitas:
+
+    Normalização de Cores: Antes de alimentar imagens RGB em redes neurais, é comum normalizar os valores dos pixels. Isso pode ser feito escalando os valores para o intervalo [0, 1] ou usando a média e o desvio padrão das imagens do conjunto de treinamento.
+    Uso de Canais de Cor: Se a cor for uma característica importante para o seu problema, garanta que você esteja usando todos os três canais RGB. Alguns problemas podem se beneficiar da conversão para outros espaços de cores, como HSV ou Lab.
+    Modelos Específicos para Dados Geométricos: Se você estiver lidando com dados que têm uma representação geométrica específica (como malhas 3D ou dados de nuvem de pontos), pode ser benéfico olhar para arquiteturas projetadas especificamente para esse tipo de dado, como PointNet para nuvens de pontos.
+    Arquiteturas de Atenção: Modelos que usam mecanismos de atenção, como as redes Transformer, podem ser benéficos para capturar relações espaciais em imagens geométricas.
+    Aumento de Dados (Data Augmentation): Para imagens RGB, o aumento de dados, como rotações, inversões e ajustes de cor, pode ajudar a melhorar o desempenho do modelo ao torná-lo mais robusto a variações.
+    Redução de Dimensionalidade: Em algumas situações, pode ser útil reduzir a dimensionalidade dos dados de cor usando técnicas como PCA antes de alimentá-los em um modelo.
+    Engenharia de Características Específicas: Dependendo da natureza do problema, pode ser útil criar características específicas com base na cor ou geometria, como histogramas de cor, descritores de textura ou características de forma.
+    Em resumo, embora as arquiteturas padrão (como ResNet, VGG, etc.) sejam adequadas para lidar com imagens RGB, a preparação dos dados e a engenharia de recursos adequadas são essenciais. Se estiver trabalhando com dados geométricos específicos, considere modelos que foram projetados ou adaptados para essa finalidade.
 """
