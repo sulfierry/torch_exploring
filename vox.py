@@ -219,25 +219,26 @@ class PDBVoxel:
         plt.tight_layout()
         plt.show()
 
-def combine_projections(projection_xz, projection_yz, projection_xy):
-    # Redimensione as projeções para terem a mesma forma
-    height, width = projection_xz.shape
-    projection_xz_color = np.zeros((height, width, 3), dtype=np.uint8)
-    projection_yz_color = np.zeros((height, width, 3), dtype=np.uint8)
-    projection_xy_color = np.zeros((height, width, 3), dtype=np.uint8)
+    @staticmethod
+    def combine_projections(projection_xz, projection_yz, projection_xy):
+        # Redimensione as projeções para terem a mesma forma
+        height, width = projection_xz.shape
+        projection_xz_color = np.zeros((height, width, 3), dtype=np.uint8)
+        projection_yz_color = np.zeros((height, width, 3), dtype=np.uint8)
+        projection_xy_color = np.zeros((height, width, 3), dtype=np.uint8)
 
-    # Aplique mapeamento de cores às projeções
-    projection_xz_color[:, :, 0] = (projection_xz * 255).astype(np.uint8)
-    projection_yz_color[:, :, 1] = (projection_yz * 255).astype(np.uint8)
-    projection_xy_color[:, :, 2] = (projection_xy * 255).astype(np.uint8)
+        # Aplique mapeamento de cores às projeções
+        projection_xz_color[:, :, 0] = (projection_xz * 255).astype(np.uint8)
+        projection_yz_color[:, :, 1] = (projection_yz * 255).astype(np.uint8)
+        projection_xy_color[:, :, 2] = (projection_xy * 255).astype(np.uint8)
 
-    # Combine as projeções coloridas
-    combined_image = projection_xz_color + projection_yz_color + projection_xy_color
+        # Combine as projeções coloridas
+        combined_image = projection_xz_color + projection_yz_color + projection_xy_color
 
-    # Certifique-se de que os valores não ultrapassem 255
-    combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
+        # Certifique-se de que os valores não ultrapassem 255
+        combined_image = np.clip(combined_image, 0, 255).astype(np.uint8)
 
-    return combined_image
+        return combined_image
 
 
 
@@ -275,9 +276,10 @@ if __name__ == "__main__":
     projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=0)
     PDBVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
 
-    combined_image = combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
+    combined_image = PDBVoxel.combine_projections(projection_sum_xz, projection_sum_yz, projection_sum_xy)
 
     # Exiba a imagem combinada
     plt.imshow(combined_image)
     plt.axis('off')  # Desligue as bordas do eixo
+    plt.title('f(x, y, z) = (2x+y, y+2z)')
     plt.show()
