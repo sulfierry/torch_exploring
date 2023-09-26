@@ -295,8 +295,3 @@ def download_data(source: str,
     
     return image_path
 
-
-
-# example of vector operation
-t_x = np.array([1, 2, 3])
-print (t_x + 3)
