@@ -346,7 +346,7 @@ class EmbeddingVoxel:
 if __name__ == "__main__":
 
     # Initializing and running
-    grid_dim = [10, 10, 10] # grid dimension in voxel unitis
+    grid_dim = [25, 25, 25] # grid dimension in voxel unitis
     grid_size = 1.0 # Ångström (Å)
     center = np.array([28.891, -0.798, 65.003]) 
     file_path = "./3c9t.pdb"
@@ -366,7 +366,7 @@ if __name__ == "__main__":
     projection_sum_xz, property_projection_xz, aa_projection_xz = voxel_instance.project_sum_with_property_and_aa(axis=1)  # Para projeção X, Z
     projection_sum_yz, property_projection_yz, aa_projection_yz = voxel_instance.project_sum_with_property_and_aa(axis=0)  # Para projeção Y, Z
     
-    # voxel_instance.plot_voxel()
+    voxel_instance.plot_voxel()
     # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_xy, aa_projection_xy, property_projection_xy, atom_info_grid, title="Projection (x,y)")
     # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_xz, aa_projection_xz, property_projection_xz, atom_info_grid, title="Projection (x,z)")
     # EmbeddingVoxel.plot_projection_with_corrected_representation(projection_sum_yz, aa_projection_yz, property_projection_yz, atom_info_grid, title="Projection (y,z)")
